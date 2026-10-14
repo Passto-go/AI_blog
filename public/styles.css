@@ -482,3 +482,46 @@ a { color: inherit; }
 .comments-empty { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
 .comments-note { color: var(--muted); font-size: 14px; margin: 0; }
 
+
+/* ================= 分享区 ================= */
+.share {
+  margin-top: 32px; padding: 14px 16px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.share-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 700; color: var(--text-strong); margin: 0 0 12px;
+}
+.share-title svg { color: var(--accent); }
+.share-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.share-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 32px; box-sizing: border-box;
+  font: inherit; font-size: 13px; font-weight: 600; line-height: 1;
+  color: var(--text); text-decoration: none; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+  padding: 7px 12px; transition: color .15s, border-color .15s, background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.share-btn:hover { color: var(--accent); border-color: var(--accent); }
+.share-btn:active { transform: translateY(1px); }
+.share-btn svg { flex: none; }
+.share-btn.is-done { color: #1a7f37; border-color: #1a7f37; }
+[data-theme="dark"] .share-btn.is-done { color: #3fb950; border-color: #3fb950; }
+.share-platform:hover { color: var(--brand, var(--accent)); border-color: var(--brand, var(--accent)); }
+.share-native[hidden] { display: none; }
+.share-toast {
+  position: fixed; left: 50%; bottom: 36px; z-index: 120;
+  max-width: calc(100vw - 48px); box-sizing: border-box;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--text-strong); color: var(--bg);
+  font-size: 13px; line-height: 1.5; text-align: center;
+  padding: 9px 16px; border-radius: 999px;
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+}
+.share-toast.show { opacity: .96; transform: translateX(-50%) translateY(0); }
+@media (max-width: 480px) {
+  .share { padding: 12px; }
+  .share-btn { font-size: 12px; padding: 7px 10px; }
+}

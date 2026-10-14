@@ -1,0 +1,176 @@
+---
+import Icon from './Icon.astro';
+import { useTranslations } from '../i18n/ui.js';
+
+const { lang = 'zh', url = '', title = '' } = Astro.props;
+const t = useTranslations(lang);
+
+const u = encodeURIComponent(url);
+const ti = encodeURIComponent(title);
+
+// 各平台分享链接（url/title 已编码）；color 仅用于 hover 时的品牌色强调
+const platforms = [
+  { key: 'weibo', label: t('share.weibo'), color: '#e6162d', href: `https://service.weibo.com/share/share.php?url=${u}&title=${ti}` },
+  { key: 'qq', label: t('share.qq'), color: '#12b7f5', href: `https://connect.qq.com/widget/shareqq/index.html?url=${u}&title=${ti}` },
+  { key: 'x', label: t('share.x'), color: '#0f1419', href: `https://twitter.com/intent/tweet?url=${u}&text=${ti}` },
+  { key: 'telegram', label: t('share.telegram'), color: '#26a5e4', href: `https://t.me/share/url?url=${u}&text=${ti}` },
+  { key: 'whatsapp', label: t('share.whatsapp'), color: '#25d366', href: `https://wa.me/?text=${ti}%20${u}` },
+  { key: 'facebook', label: t('share.facebook'), color: '#1877f2', href: `https://www.facebook.com/sharer/sharer.php?u=${u}` },
+];
+---
+<section class="share" id="share" aria-label={t('share.title')}>
+  <h3 class="share-title"><Icon name="share" size={16} /> {t('share.title')}</h3>
+  <div class="share-row">
+    <button
+      class="share-btn share-copy"
+      id="share-copy"
+      type="button"
+      data-url={url}
+      data-copy-label={t('share.copy')}
+      data-copied-label={t('share.copied')}
+      data-fail-label={t('share.copyFail')}
+    >
+      <Icon name="link" size={15} /><span class="share-btn-label">{t('share.copy')}</span>
+    </button>
+
+    <button class="share-btn" id="share-wechat" type="button" data-url={url} data-hint={t('share.wechatHint')}>
+      <Icon name="wechat" size={15} /><span>{t('share.wechat')}</span>
+    </button>
+
+    <button class="share-btn share-native" id="share-native" type="button" hidden
+      data-title={title} data-text={t('share.title')}>
+      <Icon name="share" size={15} /><span>{t('share.native')}</span>
+    </button>
+
+    <a class="share-btn" id="share-email" href={`mailto:?subject=${ti}&body=${u}`} title={t('share.email')}>
+      <Icon name="email" size={15} /><span>{t('share.email')}</span>
+    </a>
+
+    {platforms.map((p) => (
+      <a
+        class="share-btn share-platform"
+        href={p.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={p.label}
+        style={`--brand:${p.color}`}
+      ><span>{p.label}</span></a>
+    ))}
+  </div>
+  <div class="share-toast" id="share-toast" role="status" aria-live="polite"></div>
+</section>
+
+<script>
+  (function () {
+    var root = document.getElementById('share');
+    if (!root) return;
+    var toastEl = document.getElementById('share-toast');
+    var toastTimer = null;
+
+    function toast(msg) {
+      if (!toastEl) return;
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () {
+        toastEl.classList.remove('show');
+      }, 2200);
+    }
+
+    // 复制：优先 Clipboard API（需安全上下文），失败回退 execCommand
+    function copyText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text).then(
+          function () { return true; },
+          function () { return legacyCopy(text); }
+        );
+      }
+      return Promise.resolve(legacyCopy(text));
+    }
+    function legacyCopy(text) {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '0';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // ---- 复制链接：按钮短暂变为「已复制」 ----
+    var copyBtn = document.getElementById('share-copy');
+    if (copyBtn) {
+      var labelEl = copyBtn.querySelector('.share-btn-label');
+      var copyLabel = copyBtn.getAttribute('data-copy-label') || '';
+      var copiedLabel = copyBtn.getAttribute('data-copied-label') || '';
+      var failLabel = copyBtn.getAttribute('data-fail-label') || '';
+      var copyTimer = null;
+      copyBtn.addEventListener('click', function () {
+        copyText(copyBtn.getAttribute('data-url') || location.href).then(function (ok) {
+          if (ok) {
+            if (labelEl) labelEl.textContent = copiedLabel;
+            copyBtn.classList.add('is-done');
+            clearTimeout(copyTimer);
+            copyTimer = setTimeout(function () {
+              if (labelEl) labelEl.textContent = copyLabel;
+              copyBtn.classList.remove('is-done');
+            }, 1800);
+          } else {
+            toast(failLabel);
+          }
+        });
+      });
+    }
+
+    // ---- 微信：无网页直链分享，复制链接 + 提示 ----
+    var wxBtn = document.getElementById('share-wechat');
+    if (wxBtn) {
+      wxBtn.addEventListener('click', function () {
+        copyText(wxBtn.getAttribute('data-url') || location.href).then(function (ok) {
+          toast(ok ? wxBtn.getAttribute('data-hint') || '' : '');
+        });
+      });
+    }
+
+    // ---- 系统原生分享：仅当浏览器支持时显示（移动端体验最佳） ----
+    var nativeBtn = document.getElementById('share-native');
+    if (nativeBtn) {
+      if (navigator.share) {
+        nativeBtn.hidden = false;
+        nativeBtn.addEventListener('click', function () {
+          navigator.share({
+            title: nativeBtn.getAttribute('data-title') || document.title,
+            text: nativeBtn.getAttribute('data-text') || '',
+            url: location.href,
+          }).catch(function () { /* 用户取消，静默 */ });
+        });
+      }
+    }
+
+    // ---- 平台分享：桌面用居中弹窗，移动端（窄屏）用新标签页 ----
+    var popupOK = window.screen.width >= 720 && typeof window.open === 'function';
+    root.querySelectorAll('a.share-platform').forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        if (!popupOK) return; // 移动端：默认行为（新标签页）
+        e.preventDefault();
+        var w = 620, h = 560;
+        var left = Math.round((window.screen.width - w) / 2);
+        var top = Math.round((window.screen.height - h) / 2);
+        window.open(
+          a.href,
+          'share',
+          'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',noopener=yes,menubar=no,toolbar=no'
+        );
+      });
+    });
+  })();
+</script>
