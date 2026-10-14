@@ -3,7 +3,7 @@
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "22"
   # 可选：连接 Supabase 后在此填入，构建时会拉取线上文章；留空则使用内置示例文章
   # PUBLIC_SUPABASE_URL = "https://xxxx.supabase.co"
   # PUBLIC_SUPABASE_ANON_KEY = "eyJ..."
