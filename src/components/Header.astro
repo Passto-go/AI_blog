@@ -3,7 +3,7 @@ import Icon from './Icon.astro';
 import { useTranslations, localizePath, switchLangPath, languages } from '../i18n/ui.js';
 import { site } from '../data/site.js';
 
-const { lang } = Astro.props;
+const { lang, langHrefs } = Astro.props;
 const t = useTranslations(lang);
 const L = (p) => localizePath(p, lang);
 const currentPath = Astro.url.pathname;
@@ -26,7 +26,7 @@ const langList = Object.entries(languages).filter(([code]) => code !== lang);
         {langList.map(([code, info]) => (
           <a
             class="lang-link"
-            href={switchLangPath(currentPath, code)}
+            href={langHrefs?.[code] || switchLangPath(currentPath, code)}
             hreflang={info.htmlLang}
           >{info.switchLabel}</a>
         ))}

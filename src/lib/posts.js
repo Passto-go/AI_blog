@@ -84,6 +84,27 @@ export function slugify(str) {
     .replace(/[^\w\-\u4e00-\u9fa5]/g, '');
 }
 
+// 去掉语言后缀（-en/-ja）得到基准 slug：hello-en / hello-ja -> hello
+export function baseSlug(slug) {
+  return String(slug).replace(/-(en|ja)$/, '');
+}
+
+// 按约定查找文章在其他语言下的对应版本（文章的 slug 按语言独立命名：
+// 如 hello / hello-en / hello-ja 是同一篇的三种语言）。
+// 匹配顺序：1) 同 slug（三语言共用 slug 的情况） 2) 基准 slug 或 基准+-lang 后缀。
+// 找不到返回 null（调用方回退到目标语言首页，避免 404）。
+export async function findTranslation(slug, targetLang) {
+  const posts = await getPosts(targetLang);
+  const base = baseSlug(slug);
+  const candidates =
+    targetLang === 'zh' ? [base] : [base, `${base}-${targetLang}`];
+  return (
+    posts.find((p) => p.slug === slug) ||
+    posts.find((p) => candidates.includes(p.slug)) ||
+    null
+  );
+}
+
 // 渲染 Markdown，并为 h2/h3 生成锚点 id；返回 { html, headings(用于目录) }
 export function renderMarkdown(content = '') {
   const raw = marked.parse(content || '');

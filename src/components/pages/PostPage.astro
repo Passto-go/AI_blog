@@ -1,7 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { getPost, getPosts, getCategories, renderMarkdown } from '../../lib/posts.js';
-import { useTranslations, localizePath } from '../../i18n/ui.js';
+import { getPost, getPosts, getCategories, renderMarkdown, findTranslation } from '../../lib/posts.js';
+import { useTranslations, localizePath, languages } from '../../i18n/ui.js';
 import { formatDate } from '../../lib/format.js';
 import ProfileCard from '../ProfileCard.astro';
 import Toc from '../Toc.astro';
@@ -23,8 +23,18 @@ const idx = allPosts.findIndex((p) => p.slug === post.slug);
 const pagePath = localizePath(`/posts/${post.slug}/`, lang);
 const prevPost = idx > 0 ? allPosts[idx - 1] : null;
 const nextPost = idx > -1 && idx < allPosts.length - 1 ? allPosts[idx + 1] : null;
+
+// 语言切换目标地址：文章 slug 按语言独立命名（hello / hello-en / hello-ja），
+// 直接用「替换 URL 前缀」会跳到不存在的页面（404）。
+// 这里按约定找到其他语言下的对应文章；找不到则回退该语言首页。
+const langHrefs = {};
+for (const code of Object.keys(languages)) {
+  if (code === lang) continue;
+  const tr = await findTranslation(post.slug, code);
+  langHrefs[code] = tr ? localizePath(`/posts/${tr.slug}/`, code) : localizePath('/', code);
+}
 ---
-<Base lang={lang} title={post.title} description={post.excerpt || ''}>
+<Base lang={lang} title={post.title} description={post.excerpt || ''} langHrefs={langHrefs}>
   <div class="reading-bar" aria-hidden="true"><div class="reading-bar-fill" id="reading-fill"></div></div>
   <div class="post-head">
     <div class="post-head-inner">

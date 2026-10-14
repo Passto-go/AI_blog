@@ -8,6 +8,7 @@ const {
   title = '',
   description = '',
   bodyClass = '',
+  langHrefs = null,
 } = Astro.props;
 
 const t = useTranslations(lang);
@@ -19,9 +20,11 @@ const path = Astro.url.pathname;
 const canonical = Astro.site ? new URL(path, Astro.site).href : path;
 // path 是当前已本地化的路径（如 /ja/archive/），需先还原成默认语言基准路径，再分别本地化
 const basePath = path.replace(/^\/(en|ja)(?=\/|$)/, '') || '/';
-const zhHref = localizePath(basePath, 'zh');
-const enHref = localizePath(basePath, 'en');
-const jaHref = localizePath(basePath, 'ja');
+// langHrefs（文章页传入）：目标语言对应文章的真实地址；缺省回退按基准路径本地化
+const altFor = (l) => (langHrefs && langHrefs[l]) || localizePath(basePath, l);
+const zhHref = altFor('zh');
+const enHref = altFor('en');
+const jaHref = altFor('ja');
 ---
 <!doctype html>
 <html lang={languages[lang].htmlLang}>
@@ -57,7 +60,7 @@ const jaHref = localizePath(basePath, 'ja');
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body class={bodyClass}>
-    <Header lang={lang} />
+    <Header lang={lang} langHrefs={langHrefs} />
     <main class="container">
       <slot />
     </main>
