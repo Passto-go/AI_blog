@@ -30,7 +30,7 @@ const stats = [
   {socials.length > 0 && (
     <div class="profile-socials">
       {socials.map((s) => (
-        <a href={s.url} title={s.label} aria-label={s.label}
+        <a class={`profile-social social-${s.icon}`} href={s.url} title={s.label} aria-label={s.label}
            target={s.url.startsWith('http') ? '_blank' : undefined} rel="noopener">
           <Icon name={s.icon} size={20} />
         </a>
