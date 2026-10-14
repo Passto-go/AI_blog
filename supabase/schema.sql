@@ -19,11 +19,13 @@ create table if not exists posts (
 alter table posts enable row level security;
 
 -- 读者端：任何人可读已发布文章（构建时拉取用）
+drop policy if exists "public read published" on posts;
 create policy "public read published"
   on posts for select
   using (published = true);
 
 -- 写作者端：已登录用户可读写全部
+drop policy if exists "authenticated write" on posts;
 create policy "authenticated write"
   on posts for all
   to authenticated
@@ -34,10 +36,12 @@ insert into storage.buckets (id, name, public)
 values ('images', 'images', true)
 on conflict (id) do nothing;
 
+drop policy if exists "public read images" on storage.objects;
 create policy "public read images"
   on storage.objects for select
   using (bucket_id = 'images');
 
+drop policy if exists "auth upload images" on storage.objects;
 create policy "auth upload images"
   on storage.objects for insert
   to authenticated
@@ -66,11 +70,13 @@ create index if not exists comments_page_idx on comments (page, created_at);
 alter table comments enable row level security;
 
 -- 任何人可读「已审核」评论（email 不对外返回，仅作者本人可在后台查看）
+drop policy if exists "public read approved comments" on comments;
 create policy "public read approved comments"
   on comments for select
   using (approved = true);
 
 -- 匿名可插入（昵称、邮箱、内容均做基本校验；邮箱不公开显示）
+drop policy if exists "public insert comments" on comments;
 create policy "public insert comments"
   on comments for insert
   with check (
