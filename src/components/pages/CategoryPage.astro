@@ -1,0 +1,30 @@
+---
+import Base from '../../layouts/Base.astro';
+import PostCard from '../PostCard.astro';
+import { getPostsByCategory, getCategories } from '../../lib/posts.js';
+import { useTranslations, localizePath } from '../../i18n/ui.js';
+
+const { lang, slug } = Astro.props;
+const t = useTranslations(lang);
+const categories = await getCategories(lang);
+const cat = categories.find((c) => c.slug === slug);
+const name = cat?.name || t('archive.uncategorized');
+const posts = await getPostsByCategory(slug, lang);
+---
+<Base lang={lang} title={`${name} · ${t('categories.title')}`} description={`${name} — ${t('categories.intro')}`}>
+  <section class="page">
+    <p class="crumbs">
+      <a href={localizePath('/categories/', lang)}>{t('categories.title')}</a> / {name}
+    </p>
+    <h1 class="page-title">{name}</h1>
+    <p class="lead">{t('categories.count', { n: posts.length })}</p>
+
+    {posts.length === 0 ? (
+      <p class="empty">{t('home.empty')}</p>
+    ) : (
+      <div class="grid">
+        {posts.map((p) => <PostCard post={p} lang={lang} />)}
+      </div>
+    )}
+  </section>
+</Base>

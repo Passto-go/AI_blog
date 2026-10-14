@@ -1,0 +1,26 @@
+---
+import { localizePath } from '../i18n/ui.js';
+import { formatDate } from '../lib/format.js';
+
+const { post, lang = 'zh' } = Astro.props;
+const href = localizePath(`/posts/${post.slug}/`, lang);
+const dateStr = formatDate(post.published_at, lang);
+const catHref = post.categorySlug
+  ? localizePath(`/categories/${post.categorySlug}/`, lang)
+  : null;
+---
+<article class="post-card">
+  {post.cover && (
+    <a href={href} class="post-card-cover" aria-hidden="true" tabindex="-1">
+      <img src={post.cover} alt="" loading="lazy" />
+    </a>
+  )}
+  <div class="post-card-main">
+    <div class="post-meta">
+      {post.category && catHref && <a class="cat-tag" href={catHref}>{post.category}</a>}
+      <time datetime={post.published_at}>{dateStr}</time>
+    </div>
+    <h2 class="post-title"><a href={href}>{post.title}</a></h2>
+    {post.excerpt && <p class="post-excerpt">{post.excerpt}</p>}
+  </div>
+</article>

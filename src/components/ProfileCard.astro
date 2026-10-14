@@ -1,0 +1,39 @@
+---
+import Icon from './Icon.astro';
+import { site } from '../data/site.js';
+import { useTranslations } from '../i18n/ui.js';
+
+const { lang = 'zh', postsCount = 0, catsCount = 0 } = Astro.props;
+const t = useTranslations(lang);
+const socials = site.socials.filter((s) => s.url);
+const stats = [
+  { num: postsCount, lbl: t('profile.posts') },
+  { num: catsCount, lbl: t('profile.categories') },
+];
+---
+<aside class="profile-card">
+  <div class="profile-avatar">
+    <span class="avatar-fallback">{site.avatarFallback}</span>
+    {site.avatar && <img src={site.avatar} alt={site.author} onerror="this.remove()" />}
+  </div>
+  <h3 class="profile-name">{site.author}</h3>
+  <p class="profile-tagline">{site.tagline}</p>
+  <div class="profile-stats">
+    {stats.map((s) => (
+      <div class="profile-stat">
+        <div class="num">{s.num}</div>
+        <div class="lbl">{s.lbl}</div>
+      </div>
+    ))}
+  </div>
+  {socials.length > 0 && (
+    <div class="profile-socials">
+      {socials.map((s) => (
+        <a href={s.url} title={s.label} aria-label={s.label}
+           target={s.url.startsWith('http') ? '_blank' : undefined} rel="noopener">
+          <Icon name={s.icon} size={20} />
+        </a>
+      ))}
+    </div>
+  )}
+</aside>

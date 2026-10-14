@@ -1,0 +1,49 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getPosts } from '../../lib/posts.js';
+import { useTranslations, localizePath } from '../../i18n/ui.js';
+import { monthKey, monthLabel } from '../../lib/format.js';
+
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const posts = await getPosts(lang);
+
+// 按 年-月 分组
+const groups = [];
+const map = new Map();
+for (const p of posts) {
+  const key = monthKey(p.published_at);
+  if (!map.has(key)) {
+    const g = { key, label: monthLabel(p.published_at, lang), posts: [] };
+    map.set(key, g);
+    groups.push(g);
+  }
+  map.get(key).posts.push(p);
+}
+---
+<Base lang={lang} title={t('archive.title')} description={t('archive.intro')}>
+  <section class="page">
+    <h1 class="page-title">{t('archive.title')}</h1>
+    <p class="lead">{t('archive.count', { n: posts.length })}</p>
+
+    {posts.length === 0 ? (
+      <p class="empty">{t('archive.empty')}</p>
+    ) : (
+      <div class="archive">
+        {groups.map((g) => (
+          <div class="archive-group">
+            <h2 class="archive-month">{g.label}</h2>
+            <ul class="archive-list">
+              {g.posts.map((p) => (
+                <li>
+                  <time>{new Date(p.published_at).toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-CN', { day: '2-digit' })}</time>
+                  <a href={localizePath(`/posts/${p.slug}`, lang)}>{p.title}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    )}
+  </section>
+</Base>

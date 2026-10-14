@@ -1,0 +1,99 @@
+---
+import Base from '../../layouts/Base.astro';
+import { useTranslations } from '../../i18n/ui.js';
+import { localizePath } from '../../i18n/ui.js';
+
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+---
+<Base lang={lang} title={t('search.title')} description={t('search.intro')}>
+  <section class="page search-page" data-lang={lang}>
+    <h1 class="page-title">{t('search.title')}</h1>
+    <p class="lead">{t('search.intro')}</p>
+
+    <div class="search-box">
+      <input
+        id="search-input"
+        type="search"
+        placeholder={t('search.placeholder')}
+        autocomplete="off"
+        aria-label={t('search.title')}
+      />
+    </div>
+
+    <p id="search-status" class="search-status">{t('search.tip')}</p>
+    <div id="search-results" class="grid"></div>
+  </section>
+</Base>
+
+<script>
+  const root = document.querySelector('.search-page');
+  if (root) {
+    const lang = root.getAttribute('data-lang');
+    const input = document.getElementById('search-input');
+    const status = document.getElementById('search-status');
+    const results = document.getElementById('search-results');
+
+    let docs = null;
+
+    async function load() {
+      if (docs) return docs;
+      try {
+        const res = await fetch('/search-index.json');
+        const data = await res.json();
+        docs = data.filter((d) => (d.lang || 'zh') === lang);
+      } catch (e) {
+        docs = [];
+      }
+      return docs;
+    }
+
+    function render(items) {
+      if (!items.length) {
+        results.innerHTML = `<p class="empty">${tipNo}</p>`;
+        return;
+      }
+      results.innerHTML = items
+        .map(
+          (p) => `
+        <article class="card">
+          <a class="card-link" href="${lang === 'en' ? '/en' : ''}/posts/${p.slug}">
+            <div class="card-body">
+              <div class="card-meta"><time>${p.date}</time>${
+            p.category ? `<span class="cat-tag">${p.category}</span>` : ''
+          }</div>
+              <h2>${p.title}</h2>
+              ${p.excerpt ? `<p>${p.excerpt}</p>` : ''}
+            </div>
+          </a>
+        </article>`
+        )
+        .join('');
+    }
+
+    const labels = {
+      zh: { reading: '正在加载…', tip: '输入关键词开始搜索。', no: '没有找到相关文章。', found: (n) => `找到 ${n} 篇相关文章` },
+      en: { reading: 'Loading…', tip: 'Type a keyword to start searching.', no: 'No matching posts found.', found: (n) => `${n} posts found` },
+    };
+    const L = labels[lang] || labels.zh;
+    const tipNo = L.no;
+
+    input.addEventListener('input', async () => {
+      const q = input.value.trim().toLowerCase();
+      const all = await load();
+      if (!q) {
+        status.textContent = L.tip;
+        results.innerHTML = '';
+        return;
+      }
+      const hit = all.filter(
+        (p) =>
+          (p.title && p.title.toLowerCase().includes(q)) ||
+          (p.excerpt && p.excerpt.toLowerCase().includes(q)) ||
+          (p.content && p.content.toLowerCase().includes(q))
+      );
+      status.textContent = L.found(hit.length);
+      render(hit);
+    });
+  }
+</script>

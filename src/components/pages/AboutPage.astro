@@ -1,0 +1,17 @@
+---
+import Base from '../../layouts/Base.astro';
+import { useTranslations } from '../../i18n/ui.js';
+
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const paragraphs = t('about.body').split('\n\n');
+---
+<Base lang={lang} title={t('about.title')} description={t('about.lead')}>
+  <section class="page">
+    <h1 class="page-title">{t('about.title')}</h1>
+    <p class="lead">{t('about.lead')}</p>
+    <div class="prose">
+      {paragraphs.map((p) => <p>{p}</p>)}
+    </div>
+  </section>
+</Base>

@@ -1,0 +1,116 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getPost, getPosts, getCategories, renderMarkdown } from '../../lib/posts.js';
+import { useTranslations, localizePath } from '../../i18n/ui.js';
+import { formatDate } from '../../lib/format.js';
+import ProfileCard from '../ProfileCard.astro';
+import Toc from '../Toc.astro';
+import TodayQuote from '../TodayQuote.astro';
+import Countdown from '../Countdown.astro';
+
+const { lang, post } = Astro.props;
+const t = useTranslations(lang);
+const { html, headings } = renderMarkdown(post.content || '');
+const dateStr = formatDate(post.published_at, lang);
+const catHref = post.categorySlug ? localizePath(`/categories/${post.categorySlug}/`, lang) : null;
+
+const allPosts = await getPosts(lang);
+const hot = allPosts.filter((p) => p.slug !== post.slug).slice(0, 4);
+const cats = await getCategories(lang);
+const wordCount = (post.content || '').replace(/\s+/g, '').length;
+const idx = allPosts.findIndex((p) => p.slug === post.slug);
+const prevPost = idx > 0 ? allPosts[idx - 1] : null;
+const nextPost = idx > -1 && idx < allPosts.length - 1 ? allPosts[idx + 1] : null;
+---
+<Base lang={lang} title={post.title} description={post.excerpt || ''}>
+  <div class="reading-bar" aria-hidden="true"><div class="reading-bar-fill" id="reading-fill"></div></div>
+  <div class="post-head">
+    <div class="post-head-inner">
+      <h1 class="post-title">{post.title}</h1>
+      <div class="post-meta">
+        <span>{dateStr}</span>
+        {post.category && catHref && <a href={catHref} class="post-cat">{post.category}</a>}
+        <span>{t('post.words', { n: wordCount })}</span>
+      </div>
+    </div>
+    {post.cover && (
+      <div class="post-cover">
+        <img src={post.cover} alt={post.title} loading="lazy" />
+      </div>
+    )}
+  </div>
+
+  <div class="post-layout">
+    <article class="post-main">
+      {post.excerpt && <p class="post-lead">{post.excerpt}</p>}
+      <div class="content" set:html={html} />
+      <p class="back"><a href={localizePath('/', lang)}>{t('post.back')}</a></p>
+    </article>
+
+    <aside class="post-aside post-aside-left">
+      <div class="aside-card">
+        <h3 class="aside-title">{t('post.catDir')}</h3>
+        <ul class="aside-cat">
+          {cats.map((c) => (
+            <li>
+              <a href={localizePath(`/categories/${c.slug}/`, lang)}>
+                <span>{c.name || t('archive.uncategorized')}</span>
+                <span class="aside-cat-n">{c.count}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {hot.length > 0 && (
+        <div class="aside-card">
+          <h3 class="aside-title">{t('post.hot')}</h3>
+          <ul class="aside-hot">
+            {hot.map((p) => (
+              <li><a href={localizePath(`/posts/${p.slug}/`, lang)}>{p.title}</a></li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </aside>
+
+    <aside class="post-aside post-aside-right">
+      <Toc headings={headings} lang={lang} />
+      <ProfileCard lang={lang} postsCount={allPosts.length} catsCount={cats.length} />
+      <TodayQuote lang={lang} />
+      <Countdown lang={lang} />
+    </aside>
+  </div>
+
+  {(prevPost || nextPost) && (
+    <nav class="post-nav" aria-label="上一篇 / 下一篇">
+      {prevPost ? (
+        <a class="post-nav-item prev" href={localizePath(`/posts/${prevPost.slug}/`, lang)}>
+          <span class="post-nav-dir">← 上一篇</span>
+          <span class="post-nav-title">{prevPost.title}</span>
+        </a>
+      ) : <span class="post-nav-item prev disabled"></span>}
+      {nextPost ? (
+        <a class="post-nav-item next" href={localizePath(`/posts/${nextPost.slug}/`, lang)}>
+          <span class="post-nav-dir">下一篇 →</span>
+          <span class="post-nav-title">{nextPost.title}</span>
+        </a>
+      ) : <span class="post-nav-item next disabled"></span>}
+    </nav>
+  )}
+</Base>
+
+<script>
+  (function () {
+    var fill = document.getElementById('reading-fill');
+    if (!fill) return;
+    function upd() {
+      var d = document.documentElement;
+      var max = d.scrollHeight - d.clientHeight;
+      var p = max > 0 ? (d.scrollTop || document.body.scrollTop) / max * 100 : 0;
+      fill.style.width = Math.min(100, Math.max(0, p)) + '%';
+    }
+    window.addEventListener('scroll', upd, { passive: true });
+    window.addEventListener('resize', upd);
+    upd();
+  })();
+</script>

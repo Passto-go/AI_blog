@@ -1,0 +1,36 @@
+---
+import { useTranslations, localizePath } from '../i18n/ui.js';
+import { site } from '../data/site.js';
+
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const L = (p) => localizePath(p, lang);
+const year = new Date().getFullYear();
+const yearLabel = site.startYear ? `${site.startYear}–${year}` : `${year}`;
+
+const nav = [
+  { href: L('/'), label: t('nav.home') },
+  { href: L('/categories/'), label: t('nav.categories') },
+  { href: L('/about/'), label: t('nav.about') },
+  { href: L('/archive/'), label: t('nav.archive') },
+  { href: '/rss.xml', label: 'RSS' },
+];
+---
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <nav class="footer-nav" aria-label="Footer">
+      {nav.map((item) => <a href={item.href}>{item.label}</a>)}
+    </nav>
+
+    <div class="footer-meta">
+      <p>{t('footer.copyright', { year: yearLabel })}</p>
+      <p>Licensed under <a href={site.license.url} target="_blank" rel="noopener">{site.license.name}</a></p>
+      <p>Powered by
+        {site.poweredBy.map((p, i) => (
+          <span>{i > 0 && ' & '}<a href={p.url} target="_blank" rel="noopener">{p.name}</a></span>
+        ))}
+      </p>
+      <p>Hosted by <a href={site.hostedBy.url} target="_blank" rel="noopener">{site.hostedBy.name}</a></p>
+    </div>
+  </div>
+</footer>

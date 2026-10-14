@@ -1,0 +1,221 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base lang="zh" title="写作后台" description="登录后在线撰写与发布文章">
+  <div class="admin">
+    <h1>写作后台</h1>
+
+    <div id="cfg-note" class="admin-note" style="display:none">
+      未检测到 Supabase 配置。请在仓库根目录的 <code>.env</code> 填入
+      <code>PUBLIC_SUPABASE_URL</code> 与 <code>PUBLIC_SUPABASE_ANON_KEY</code> 后重新部署。
+    </div>
+
+    <!-- 登录 -->
+    <section id="login-box">
+      <h2>登录</h2>
+      <p class="admin-note">使用你注册的 Supabase 邮箱 / 密码登录。国内访问 Supabase 若不畅，请改用代理或海外网络。</p>
+      <form id="login-form" class="admin-form">
+        <div>
+          <label for="email">邮箱</label>
+          <input id="email" type="email" autocomplete="username" placeholder="you@example.com" required />
+        </div>
+        <div>
+          <label for="password">密码</label>
+          <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+        </div>
+        <div>
+          <button class="btn-accent" type="submit">登录</button>
+          <span id="login-msg" style="color:var(--muted);font-size:14px;margin-left:10px"></span>
+        </div>
+      </form>
+    </section>
+
+    <!-- 编辑器 -->
+    <section id="editor-box" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <h2 style="margin:0">撰写文章</h2>
+        <button class="btn-ghost" id="logout-btn" type="button">退出登录</button>
+      </div>
+      <p class="admin-note">保存即写入 Supabase；纯静态站点需<b>重新构建 / 部署</b>（Netlify 重新触发 Build）后，读者端才会更新。</p>
+
+      <form id="post-form" class="admin-form">
+        <input type="hidden" id="post-id" />
+        <div class="admin-row">
+          <div>
+            <label for="f-title">标题</label>
+            <input id="f-title" type="text" placeholder="标题" required />
+          </div>
+          <div>
+            <label for="f-slug">Slug（URL 片段，留空自动生成）</label>
+            <input id="f-slug" type="text" placeholder="my-post" />
+          </div>
+        </div>
+        <div class="admin-row">
+          <div>
+            <label for="f-lang">语言</label>
+            <select id="f-lang">
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+          <div>
+            <label for="f-category">分类名</label>
+            <input id="f-category" type="text" placeholder="随笔 / Essays" />
+          </div>
+          <div>
+            <label for="f-catslug">分类 Slug（留空自动生成）</label>
+            <input id="f-catslug" type="text" placeholder="essays" />
+          </div>
+        </div>
+        <div>
+          <label for="f-excerpt">摘要</label>
+          <input id="f-excerpt" type="text" placeholder="一句话摘要（列表页显示）" />
+        </div>
+        <div>
+          <label for="f-cover">封面图 URL（可选）</label>
+          <input id="f-cover" type="text" placeholder="https://..." />
+        </div>
+        <div>
+          <label for="f-content">正文（Markdown）</label>
+          <textarea id="f-content" placeholder="# 标题&#10;&#10;正文内容，支持 Markdown…"></textarea>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--text)">
+            <input id="f-published" type="checkbox" checked /> 已发布
+          </label>
+          <button class="btn-accent" type="submit">保存</button>
+          <button class="btn-ghost" type="button" id="reset-btn">新建 / 清空</button>
+          <span id="save-msg" style="color:var(--muted);font-size:14px"></span>
+        </div>
+      </form>
+
+      <h2 style="margin-top:28px">已有文章</h2>
+      <ul class="admin-list" id="post-list"></ul>
+    </section>
+  </div>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  const URL = import.meta.env.PUBLIC_SUPABASE_URL;
+  const KEY = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+  const $ = (id) => document.getElementById(id);
+
+  if (!URL || !KEY) {
+    $('cfg-note').style.display = 'block';
+    $('login-box').style.display = 'none';
+  } else {
+    const supabase = createClient(URL, KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+
+    function slugify(str) {
+      return String(str).trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-\u4e00-\u9fa5]/g, '');
+    }
+
+    async function showEditor() {
+      $('login-box').style.display = 'none';
+      $('editor-box').style.display = 'block';
+      await loadList();
+    }
+
+    function showLogin(msg) {
+      $('login-box').style.display = 'block';
+      $('editor-box').style.display = 'none';
+      if (msg) $('login-msg').textContent = msg;
+    }
+
+    function setForm(p) {
+      $('post-id').value = p.id || '';
+      $('f-title').value = p.title || '';
+      $('f-slug').value = p.slug || '';
+      $('f-lang').value = p.lang || 'zh';
+      $('f-category').value = p.category || '';
+      $('f-catslug').value = p.category_slug || '';
+      $('f-excerpt').value = p.excerpt || '';
+      $('f-cover').value = p.cover || '';
+      $('f-content').value = p.content || '';
+      $('f-published').checked = p.published !== false;
+    }
+
+    async function loadList() {
+      const { data, error } = await supabase
+        .from('posts').select('*').order('published_at', { ascending: false });
+      const ul = $('post-list');
+      ul.innerHTML = '';
+      if (error) { ul.innerHTML = '<li>读取失败：' + error.message + '</li>'; return; }
+      (data || []).forEach((p) => {
+        const li = document.createElement('li');
+        const t = document.createElement('div');
+        t.className = 't';
+        t.innerHTML = `<strong>${p.title}</strong> <small>· ${p.lang || 'zh'} · ${p.published ? '已发布' : '草稿'}</small>`;
+        const edit = document.createElement('button');
+        edit.className = 'btn-ghost'; edit.textContent = '编辑';
+        edit.onclick = () => { setForm(p); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+        const del = document.createElement('button');
+        del.className = 'btn-ghost'; del.textContent = '删除';
+        del.onclick = async () => {
+          if (!confirm('确定删除《' + p.title + '》？')) return;
+          const { error } = await supabase.from('posts').delete().eq('id', p.id);
+          if (error) alert('删除失败：' + error.message); else loadList();
+        };
+        li.append(t, edit, del);
+        ul.append(li);
+      });
+    }
+
+    $('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('login-msg').textContent = '登录中…';
+      const { error } = await supabase.auth.signInWithPassword({
+        email: $('email').value, password: $('password').value,
+      });
+      if (error) { $('login-msg').textContent = '失败：' + error.message; return; }
+      $('login-msg').textContent = '';
+      showEditor();
+    });
+
+    $('logout-btn').addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      showLogin();
+    });
+
+    $('reset-btn').addEventListener('click', () => setForm({}));
+
+    $('post-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = $('post-id').value;
+      const category = $('f-category').value.trim();
+      const row = {
+        title: $('f-title').value.trim(),
+        slug: ($('f-slug').value.trim() || slugify($('f-title').value)) || ('post-' + Date.now()),
+        lang: $('f-lang').value,
+        category,
+        category_slug: ($('f-catslug').value.trim() || slugify(category) || 'uncategorized'),
+        excerpt: $('f-excerpt').value.trim(),
+        cover: $('f-cover').value.trim(),
+        content: $('f-content').value,
+        published: $('f-published').checked,
+        published_at: new Date().toISOString(),
+      };
+      $('save-msg').textContent = '保存中…';
+      let error;
+      if (id) {
+        const r = await supabase.from('posts').update(row).eq('id', id);
+        error = r.error;
+      } else {
+        const r = await supabase.from('posts').insert(row);
+        error = r.error;
+      }
+      if (error) { $('save-msg').textContent = '失败：' + error.message; return; }
+      $('save-msg').textContent = '已保存 ✓ 请重新构建 / 部署以发布';
+      setForm({});
+      loadList();
+    });
+
+    // 进入页面时若已有会话，直接进编辑器
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) showEditor();
+    });
+  }
+</script>

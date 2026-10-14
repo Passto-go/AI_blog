@@ -1,0 +1,53 @@
+---
+import Icon from './Icon.astro';
+import { useTranslations, localizePath, switchLangPath, altLang, languages } from '../i18n/ui.js';
+import { site } from '../data/site.js';
+
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const L = (p) => localizePath(p, lang);
+const other = altLang(lang);
+const currentPath = Astro.url.pathname;
+
+const nav = [
+  { href: L('/'), label: t('nav.home') },
+  { href: L('/categories/'), label: t('nav.categories') },
+  { href: L('/about/'), label: t('nav.about') },
+  { href: L('/archive/'), label: t('nav.archive') },
+];
+---
+<header class="site-header">
+  <div class="wrap header-inner">
+    <nav class="main-nav" aria-label="Primary">
+      {nav.map((item) => <a href={item.href}>{item.label}</a>)}
+      <a class="lang-switch" href={switchLangPath(currentPath, other)} aria-label="Switch language">
+        {languages[other].switchLabel}
+      </a>
+    </nav>
+
+    <div class="header-actions">
+      <div class="header-icons">
+        <a href={L('/rss.xml')} title={t('icon.rss')} aria-label={t('icon.rss')}><Icon name="rss" /></a>
+        <a href="/sitemap-index.xml" title={t('icon.sitemap')} aria-label={t('icon.sitemap')}><Icon name="sitemap" /></a>
+        <a href={L('/search/')} title={t('icon.search')} aria-label={t('icon.search')}><Icon name="search" /></a>
+      </div>
+      <button class="theme-toggle" id="theme-toggle" type="button" title={t('icon.theme')} aria-label={t('icon.theme')}>
+        <Icon name="sun" class="i-sun" />
+        <Icon name="moon" class="i-moon" />
+      </button>
+      <a class="login-link" href={L(site.loginPath)}><Icon name="login" size={15} /> {t('nav.login')}</a>
+    </div>
+  </div>
+</header>
+
+<script>
+  // 主题切换：点击在 light/dark 间切换并记忆；再次切回 auto 由刷新时按时间决定
+  function toggleTheme() {
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    var next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch (e) {}
+  }
+  var btn = document.getElementById('theme-toggle');
+  if (btn) btn.addEventListener('click', toggleTheme);
+</script>

@@ -1,0 +1,46 @@
+---
+import Icon from './Icon.astro';
+import { site } from '../data/site.js';
+import { useTranslations } from '../i18n/ui.js';
+
+const { lang = 'zh' } = Astro.props;
+const t = useTranslations(lang);
+const cd = site.countdown;
+const labels = lang === 'en' ? ['Days', 'Hrs', 'Min', 'Sec'] : ['天', '时', '分', '秒'];
+const units = ['d', 'h', 'm', 's'];
+---
+<section class="widget">
+  <h4 class="widget-title"><Icon name="clock" size={15} /> {t('widget.countdown')}</h4>
+  <p class="countdown-label">{t('widget.countdownTo', { label: cd.label })}</p>
+  <div class="countdown-grid" id="countdown">
+    {units.map((u, i) => (
+      <div class="cd-cell">
+        <div class="cd-num" data-cd={u}>--</div>
+        <div class="lbl">{labels[i]}</div>
+      </div>
+    ))}
+  </div>
+</section>
+
+<script define:vars={{ target: cd.target }}>
+  (function () {
+    var el = document.getElementById('countdown');
+    if (!el) return;
+    var end = new Date(target).getTime();
+    function p2(n) { return String(n).padStart(2, '0'); }
+    function tick() {
+      var diff = end - Date.now();
+      if (diff < 0) diff = 0;
+      var d = Math.floor(diff / 86400000);
+      var h = Math.floor((diff % 86400000) / 3600000);
+      var m = Math.floor((diff % 3600000) / 60000);
+      var s = Math.floor((diff % 60000) / 1000);
+      el.querySelector('[data-cd="d"]').textContent = d;
+      el.querySelector('[data-cd="h"]').textContent = p2(h);
+      el.querySelector('[data-cd="m"]').textContent = p2(m);
+      el.querySelector('[data-cd="s"]').textContent = p2(s);
+    }
+    tick();
+    setInterval(tick, 1000);
+  })();
+</script>

@@ -1,0 +1,28 @@
+---
+import Icon from './Icon.astro';
+import { site } from '../data/site.js';
+import { useTranslations } from '../i18n/ui.js';
+
+const { lang = 'zh' } = Astro.props;
+const t = useTranslations(lang);
+const quotes = site.quotes[lang] || site.quotes.zh;
+// 服务端预填一条（按构建当天），客户端脚本会按访问者当天替换为正确那条
+const start = new Date(new Date().getFullYear(), 0, 0);
+const dayOfYear = Math.floor((Date.now() - start) / 86400000);
+const initial = quotes[dayOfYear % quotes.length] || quotes[0];
+---
+<section class="widget">
+  <h4 class="widget-title"><Icon name="quote" size={15} /> {t('widget.quote')}</h4>
+  <p class="widget-quote" id="today-quote">{initial}</p>
+</section>
+
+<script define:vars={{ quotes }}>
+  (function () {
+    var list = quotes || [];
+    if (!list.length) return;
+    var s = new Date(new Date().getFullYear(), 0, 0);
+    var diff = Math.floor((Date.now() - s) / 86400000);
+    var el = document.getElementById('today-quote');
+    if (el) el.textContent = list[diff % list.length];
+  })();
+</script>

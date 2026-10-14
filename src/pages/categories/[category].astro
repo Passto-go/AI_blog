@@ -1,0 +1,12 @@
+---
+import CategoryPage from '../../components/pages/CategoryPage.astro';
+import { getCategories } from '../../lib/posts.js';
+
+export async function getStaticPaths() {
+  const cats = await getCategories('zh');
+  return cats.map((c) => ({ params: { category: c.slug }, props: { slug: c.slug, lang: 'zh' } }));
+}
+
+const { lang, slug } = Astro.props;
+---
+<CategoryPage lang={lang} slug={slug} />

@@ -1,0 +1,30 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCategories } from '../../lib/posts.js';
+import { useTranslations, localizePath } from '../../i18n/ui.js';
+
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const categories = await getCategories(lang);
+---
+<Base lang={lang} title={t('categories.title')} description={t('categories.intro')}>
+  <section class="page">
+    <h1 class="page-title">{t('categories.title')}</h1>
+    <p class="lead">{t('categories.intro')}</p>
+
+    {categories.length === 0 ? (
+      <p class="empty">{t('categories.empty')}</p>
+    ) : (
+      <ul class="cat-list">
+        {categories.map((c) => (
+          <li>
+            <a href={localizePath(`/categories/${c.slug}/`, lang)}>
+              <span class="cat-name">{c.name || t('archive.uncategorized')}</span>
+              <span class="cat-count">{t('categories.count', { n: c.count })}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    )}
+  </section>
+</Base>

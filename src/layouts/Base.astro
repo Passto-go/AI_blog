@@ -1,0 +1,62 @@
+---
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { useTranslations, localizePath, languages } from '../i18n/ui.js';
+
+const {
+  lang = 'zh',
+  title = '',
+  description = '',
+  bodyClass = '',
+} = Astro.props;
+
+const t = useTranslations(lang);
+const siteName = t('site.name');
+const pageTitle = title ? `${title} · ${siteName}` : siteName;
+const desc = description || t('site.description');
+
+const path = Astro.url.pathname;
+const canonical = Astro.site ? new URL(path, Astro.site).href : path;
+const zhHref = localizePath(path, 'zh');
+const enHref = localizePath(path, 'en');
+---
+<!doctype html>
+<html lang={languages[lang].htmlLang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script is:inline>
+      // 昼夜自动主题：优先用用户手动选择；否则按本地时间（19:00–07:00 为夜间）
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme');
+          var theme = saved;
+          if (theme !== 'light' && theme !== 'dark') {
+            var h = new Date().getHours();
+            theme = (h >= 19 || h < 7) ? 'dark' : 'light';
+          }
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
+    <title>{pageTitle}</title>
+    <meta name="description" content={desc} />
+    <link rel="canonical" href={canonical} />
+
+    <link rel="alternate" hreflang="zh-CN" href={zhHref} />
+    <link rel="alternate" hreflang="en" href={enHref} />
+    <link rel="alternate" hreflang="x-default" href={zhHref} />
+
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class={bodyClass}>
+    <Header lang={lang} />
+    <main class="container">
+      <slot />
+    </main>
+    <Footer lang={lang} />
+  </body>
+</html>
