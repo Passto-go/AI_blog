@@ -1,4 +1,4 @@
-# 个人生活随笔博客 · v1.1（Halo 风格 · 中英双语）
+# 个人生活随笔博客 · v1.1（ 中英双语）
 
 技术栈：**Astro（纯静态） + Supabase（云端数据库）**。读者端为纯静态页面，国内外均可快速访问；文章写在 Supabase，构建时拉取生成静态页。
 
@@ -18,7 +18,7 @@ npm run dev                 # 打开 http://localhost:4321
 
 ---
 
-## 二、配置 Supabase（你已注册）
+## 二、配置 Supabase
 
 1. 后台 → **SQL Editor** 执行 `supabase/schema.sql`（建表 + 权限 + 图床桶；已含 `lang / category / category_slug` 字段）。
 2. 后台 → **Project Settings → API** 复制 `Project URL` 和 `anon public` key，填进 `.env`（复制 `.env.example`）：
