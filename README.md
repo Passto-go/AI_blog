@@ -59,7 +59,7 @@ npm run dev                 # 打开 http://localhost:4321
 | `/search-index.json` | 搜索索引（构建生成） |
 
 顶部导航：**主页 / 分类 / 关于 / 归档 / EN（语言切换）**，右侧三个图标分别是 **RSS / 站点地图 / 搜索**。
-底部栏：**主页 / 分类 / 关于 / 归档 / RSS** + 版权「皮蛋solo粥」+ *Licensed under CC BY-NC 4.0* + *Powered by Astro* + *Hosted by Netlify*。
+底部栏：**主页 / 分类 / 关于 / 归档 / RSS** + 版权「YOUR NAME」+ *Licensed under CC BY-NC 4.0* + *Powered by Astro* + *Hosted by Netlify*。
 
 ---
 
@@ -71,7 +71,7 @@ npm run build     # 生成 dist/
 ```
 `dist/` 是纯静态站点，传到任何静态托管都行。**以下方案都不花钱（仅域名续费另算）。**
 
-**方案 A（现在就用，¥0）：Netlify 免费版（你选定的方案）**
+**方案 A（现在就用，¥0）：Netlify 免费版（选定的方案）**
 1. 把仓库推到 GitHub，在 Netlify 关联仓库；构建命令 `npm run build`，发布目录 `dist`。
 2. **Site settings → Environment variables** 添加 `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY`。
 3. 绑域名：**Domain settings → Add custom domain** → 填你的个人域名 → DNS 的 CNAME 指向 Netlify 给的地址（免费 HTTPS）。
@@ -79,7 +79,7 @@ npm run build     # 生成 dist/
 
 > 国内访问预期：Netlify 免费版在大陆通常「能用但偏慢」。等每月有 ¥15 左右，把 `dist/` 传到腾讯云 COS+CDN 即变快，代码一行不用改。
 
-> ⚠️ 写作时 `/admin` 已不存在；若你人在国内、登录 Supabase 后台不便，可在能联网时操作，或以后让我把写作端换成免费国产 CloudBase。
+> ⚠️ 写作时 `/admin` 已不存在；若你人在国内、登录 Supabase 后台不便，可在能联网时操作，或以后把写作端换成免费国产 CloudBase。
 
 ---
 
