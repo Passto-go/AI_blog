@@ -508,7 +508,15 @@ a { color: inherit; }
   -webkit-tap-highlight-color: transparent;
 }
 .share-btn svg { flex: none; }
+/* 品牌图标始终显示各自的品牌色（颜色由按钮的 --brand 变量提供），文字保持中性灰 */
+.share-platform svg, .share-wechat svg { color: var(--brand); }
 .share-btn:hover { color: var(--accent); }
+/* hover 时文字变主题色，品牌图标保持各自颜色不变 */
+.share-platform:hover, .share-wechat:hover { color: var(--accent); }
+.share-platform:hover svg, .share-wechat:hover svg { color: var(--brand); }
+/* 深色背景下 X 品牌色（近黑）不可见，改用浅色 */
+[data-theme="dark"] .share-x svg { color: #e7e9ea; }
+[data-theme="dark"] .share-x:hover svg { color: #e7e9ea; }
 .share-btn:active { transform: translateY(1px); }
 .share-btn.is-done { color: #1a7f37; }
 [data-theme="dark"] .share-btn.is-done { color: #3fb950; }

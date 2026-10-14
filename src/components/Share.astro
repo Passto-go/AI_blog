@@ -8,14 +8,14 @@ const t = useTranslations(lang);
 const u = encodeURIComponent(url);
 const ti = encodeURIComponent(title);
 
-// 各平台分享链接（url/title 已编码）；图标名与 platforms key 对应 Icon.astro 中的品牌图标
+// 各平台分享链接（url/title 已编码）；color 为品牌色，作用于图标（--brand），使图标始终显示品牌色
 const platforms = [
-  { key: 'weibo', label: t('share.weibo'), href: `https://service.weibo.com/share/share.php?url=${u}&title=${ti}` },
-  { key: 'qq', label: t('share.qq'), href: `https://connect.qq.com/widget/shareqq/index.html?url=${u}&title=${ti}` },
-  { key: 'x', label: t('share.x'), href: `https://twitter.com/intent/tweet?url=${u}&text=${ti}` },
-  { key: 'telegram', label: t('share.telegram'), href: `https://t.me/share/url?url=${u}&text=${ti}` },
-  { key: 'whatsapp', label: t('share.whatsapp'), href: `https://wa.me/?text=${ti}%20${u}` },
-  { key: 'facebook', label: t('share.facebook'), href: `https://www.facebook.com/sharer/sharer.php?u=${u}` },
+  { key: 'weibo', label: t('share.weibo'), color: '#e6162d', href: `https://service.weibo.com/share/share.php?url=${u}&title=${ti}` },
+  { key: 'qq', label: t('share.qq'), color: '#12b7f5', href: `https://connect.qq.com/widget/shareqq/index.html?url=${u}&title=${ti}` },
+  { key: 'x', label: t('share.x'), color: '#0f1419', href: `https://twitter.com/intent/tweet?url=${u}&text=${ti}` },
+  { key: 'telegram', label: t('share.telegram'), color: '#26a5e4', href: `https://t.me/share/url?url=${u}&text=${ti}` },
+  { key: 'whatsapp', label: t('share.whatsapp'), color: '#25d366', href: `https://wa.me/?text=${ti}%20${u}` },
+  { key: 'facebook', label: t('share.facebook'), color: '#1877f2', href: `https://www.facebook.com/sharer/sharer.php?u=${u}` },
 ];
 ---
 <section class="share" id="share" aria-label={t('share.title')}>
@@ -33,7 +33,7 @@ const platforms = [
       <Icon name="link" size={15} /><span class="share-btn-label">{t('share.copy')}</span>
     </button>
 
-    <button class="share-btn" id="share-wechat" type="button" data-url={url} data-hint={t('share.wechatHint')}>
+    <button class="share-btn share-wechat" id="share-wechat" type="button" data-url={url} data-hint={t('share.wechatHint')} style="--brand:#07c160">
       <Icon name="wechat" size={15} /><span>{t('share.wechat')}</span>
     </button>
 
@@ -48,12 +48,13 @@ const platforms = [
 
     {platforms.map((p) => (
       <a
-        class="share-btn share-platform"
+        class={`share-btn share-platform share-${p.key}`}
         href={p.href}
         target="_blank"
         rel="noopener noreferrer"
         title={p.label}
         aria-label={p.label}
+        style={`--brand:${p.color}`}
       ><Icon name={p.key} size={16} /><span>{p.label}</span></a>
     ))}
   </div>
