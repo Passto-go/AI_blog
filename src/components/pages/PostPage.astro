@@ -17,7 +17,6 @@ const dateStr = formatDate(post.published_at, lang);
 const catHref = post.categorySlug ? localizePath(`/categories/${post.categorySlug}/`, lang) : null;
 
 const allPosts = await getPosts(lang);
-const hot = allPosts.filter((p) => p.slug !== post.slug).slice(0, 4);
 const cats = await getCategories(lang);
 const wordCount = (post.content || '').replace(/\s+/g, '').length;
 const idx = allPosts.findIndex((p) => p.slug === post.slug);
@@ -63,32 +62,6 @@ for (const code of Object.keys(languages)) {
       <Comments lang={lang} page={pagePath} />
       <p class="back"><a href={localizePath('/', lang)}>{t('post.back')}</a></p>
     </article>
-
-    <aside class="post-aside post-aside-left">
-      <div class="aside-card">
-        <h3 class="aside-title">{t('post.catDir')}</h3>
-        <ul class="aside-cat">
-          {cats.map((c) => (
-            <li>
-              <a href={localizePath(`/categories/${c.slug}/`, lang)}>
-                <span>{c.name || t('archive.uncategorized')}</span>
-                <span class="aside-cat-n">{c.count}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      </div>
-      {hot.length > 0 && (
-        <div class="aside-card">
-          <h3 class="aside-title">{t('post.hot')}</h3>
-          <ul class="aside-hot">
-            {hot.map((p) => (
-              <li><a href={localizePath(`/posts/${p.slug}/`, lang)}>{p.title}</a></li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </aside>
 
     <aside class="post-aside post-aside-right">
       <Toc headings={headings} lang={lang} />
