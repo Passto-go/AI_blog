@@ -152,11 +152,13 @@ a { color: inherit; }
 .profile-socials a:hover { color: var(--accent); transform: translateY(-2px); }
 /* 社交图标显示各自品牌色（按图标类型着色）；深色下 GitHub 黑改用浅色 */
 .profile-socials a.social-github svg { color: #181717; }
+.profile-socials a.social-x svg { color: #000000; }
 .profile-socials a.social-email svg { color: #0969da; }
 .profile-socials a.social-rss svg { color: #f26522; }
 .profile-socials a.social-wechat svg { color: #07c160; }
 .profile-socials a.social-tiktok svg { color: #ff0050; }
 [data-theme="dark"] .profile-socials a.social-github svg { color: #e7e9ea; }
+[data-theme="dark"] .profile-socials a.social-x svg { color: #e7e9ea; }
 /* hover 时图标随主题色高亮（覆盖品牌色） */
 .profile-socials a:hover svg { color: var(--accent); }
 

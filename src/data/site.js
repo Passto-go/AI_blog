@@ -23,6 +23,7 @@ export const site = {
   // url 留空则该图标不显示
   socials: [
     { icon: 'github', label: 'GitHub', url: 'https://github.com/Passto-go' },
+    { icon: 'x', label: 'X', url: 'https://x.com/Panda_Q1' },
     { icon: 'email', label: 'Email', url: 'mailto:intl1024@outlook.com' },
     { icon: 'rss', label: 'RSS', url: '/rss.xml' },
     { icon: 'wechat', label: '微信', url: '' },
