@@ -6,7 +6,7 @@ import { useTranslations } from '../i18n/ui.js';
 const { lang = 'zh' } = Astro.props;
 const t = useTranslations(lang);
 const cd = site.countdown;
-const labels = lang === 'en' ? ['Days', 'Hrs', 'Min', 'Sec'] : ['天', '时', '分', '秒'];
+const labels = lang === 'en' ? ['Days', 'Hrs', 'Min', 'Sec'] : lang === 'ja' ? ['日', '時', '分', '秒'] : ['天', '时', '分', '秒'];
 const units = ['d', 'h', 'm', 's'];
 ---
 <section class="widget">

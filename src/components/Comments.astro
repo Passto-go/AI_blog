@@ -11,7 +11,9 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
   <section class="comments" id="comments" data-page={page} data-lang={lang}
     data-required={t('post.commentRequired')}
     data-sending={t('post.commentSending')}
-    data-error={t('post.commentError')}>
+    data-error={t('post.commentError')}
+    data-name-required={t('post.commentNameRequired')}
+    data-email-invalid={t('post.commentEmailInvalid')}>
     <h2 class="comments-title">
       <Icon name="comment" size={18} />
       <span>{t('post.comments')}</span>
@@ -19,14 +21,26 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     </h2>
 
     <form class="comments-form" id="comments-form" autocomplete="off">
-      <input
-        class="comments-name"
-        id="comments-name"
-        type="text"
-        maxlength="40"
-        placeholder={t('post.commentName')}
-        aria-label={t('post.commentName')}
-      />
+      <div class="comments-row">
+        <input
+          class="comments-name"
+          id="comments-name"
+          type="text"
+          maxlength="40"
+          placeholder={t('post.commentName')}
+          aria-label={t('post.commentName')}
+          required
+        />
+        <input
+          class="comments-email"
+          id="comments-email"
+          type="email"
+          maxlength="120"
+          placeholder={t('post.commentEmail')}
+          aria-label={t('post.commentEmail')}
+          required
+        />
+      </div>
       <!-- 蜜罐：正常用户看不到也填不了，机器人若填了则静默丢弃 -->
       <input class="comments-hp" id="comments-hp" type="text" tabindex="-1" aria-hidden="true" autocomplete="off" />
       <textarea
@@ -109,9 +123,13 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     const tRequired = root.dataset.required || '评论内容不能为空。';
     const tSending = root.dataset.sending || '发送中…';
     const tError = root.dataset.error || '评论发送失败，请稍后重试。';
+    const tNameRequired = root.dataset.nameRequired || '昵称不能为空。';
+    const tEmailInvalid = root.dataset.emailInvalid || '请输入有效的邮箱地址。';
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     const form = document.getElementById('comments-form');
     const nameEl = document.getElementById('comments-name');
+    const emailEl = document.getElementById('comments-email');
     const hpEl = document.getElementById('comments-hp');
     const textEl = document.getElementById('comments-text');
     const submitBtn = document.getElementById('comments-submit');
@@ -163,7 +181,19 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
       if (hpEl.value) { form.reset(); return; }
 
       const content = (textEl.value || '').trim();
-      const author = (nameEl.value || '').trim() || '匿名';
+      const author = (nameEl.value || '').trim();
+      const email = (emailEl.value || '').trim();
+
+      if (!author) {
+        msgEl.textContent = tNameRequired;
+        msgEl.className = 'comments-msg comments-msg-err';
+        return;
+      }
+      if (!emailRe.test(email)) {
+        msgEl.textContent = tEmailInvalid;
+        msgEl.className = 'comments-msg comments-msg-err';
+        return;
+      }
       if (!content) {
         msgEl.textContent = tRequired;
         msgEl.className = 'comments-msg comments-msg-err';
@@ -176,7 +206,12 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
 
       const { error } = await supabase
         .from('comments')
-        .insert({ page, author: author.slice(0, 40), content: content.slice(0, 1000) });
+        .insert({
+          page,
+          author: author.slice(0, 40),
+          email: email.slice(0, 120),
+          content: content.slice(0, 1000),
+        });
 
       submitBtn.disabled = false;
       submitBtn.textContent = original;

@@ -1,12 +1,11 @@
 ---
 import Icon from './Icon.astro';
-import { useTranslations, localizePath, switchLangPath, altLang, languages } from '../i18n/ui.js';
+import { useTranslations, localizePath, switchLangPath, languages } from '../i18n/ui.js';
 import { site } from '../data/site.js';
 
 const { lang } = Astro.props;
 const t = useTranslations(lang);
 const L = (p) => localizePath(p, lang);
-const other = altLang(lang);
 const currentPath = Astro.url.pathname;
 
 const nav = [
@@ -15,14 +14,23 @@ const nav = [
   { href: L('/about/'), label: t('nav.about') },
   { href: L('/archive/'), label: t('nav.archive') },
 ];
+
+const langList = Object.entries(languages);
 ---
 <header class="site-header">
   <div class="wrap header-inner">
     <nav class="main-nav" aria-label="Primary">
       {nav.map((item) => <a href={item.href}>{item.label}</a>)}
-      <a class="lang-switch" href={switchLangPath(currentPath, other)} aria-label="Switch language">
-        {languages[other].switchLabel}
-      </a>
+      <div class="lang-menu" role="group" aria-label="Language">
+        {langList.map(([code, info]) => (
+          <a
+            class:list={['lang-link', { active: code === lang }]}
+            href={switchLangPath(currentPath, code)}
+            hreflang={info.htmlLang}
+            aria-current={code === lang ? 'true' : undefined}
+          >{info.label}</a>
+        ))}
+      </div>
     </nav>
 
     <div class="header-actions">

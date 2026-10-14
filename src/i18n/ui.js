@@ -1,10 +1,11 @@
-// 双语（zh / en）文案与路由辅助
+// 双语（zh / en / ja）文案与路由辅助
 export const defaultLang = 'zh';
 
 // switchLabel = 在“另一种语言”的页面里，这个链接显示的文案（即“切过去”的目标语言）
 export const languages = {
   zh: { label: '中文', switchLabel: '中文', htmlLang: 'zh-CN' },
   en: { label: 'English', switchLabel: 'EN', htmlLang: 'en' },
+  ja: { label: '日本語', switchLabel: '日本語', htmlLang: 'ja' },
 };
 
 export const ui = {
@@ -71,7 +72,8 @@ export const ui = {
     'post.words': '约 {n} 字',
 
     'post.comments': '评论',
-    'post.commentName': '昵称（可选）',
+    'post.commentName': '昵称（必填）',
+    'post.commentEmail': '邮箱（必填）',
     'post.commentPlaceholder': '说点什么吧…（理性发言，友善交流）',
     'post.commentSubmit': '发表评论',
     'post.commentSending': '发送中…',
@@ -79,6 +81,8 @@ export const ui = {
     'post.commentDisabled': '评论功能未启用（站点未配置 Supabase）。',
     'post.commentError': '评论发送失败，请稍后重试。',
     'post.commentRequired': '评论内容不能为空哦。',
+    'post.commentNameRequired': '昵称不能为空。',
+    'post.commentEmailInvalid': '请输入有效的邮箱地址。',
 
     'footer.copyright': 'Copyright © {year} 皮蛋solo粥',
     'footer.license': 'Licensed under CC BY-NC 4.0',
@@ -152,7 +156,8 @@ export const ui = {
     'post.words': '~{n} words',
 
     'post.comments': 'Comments',
-    'post.commentName': 'Name (optional)',
+    'post.commentName': 'Name (required)',
+    'post.commentEmail': 'Email (required)',
     'post.commentPlaceholder': 'Say something… (be kind, be civil)',
     'post.commentSubmit': 'Post comment',
     'post.commentSending': 'Sending…',
@@ -160,6 +165,8 @@ export const ui = {
     'post.commentDisabled': 'Comments are disabled (Supabase not configured).',
     'post.commentError': 'Failed to post. Please try again later.',
     'post.commentRequired': 'Comment cannot be empty.',
+    'post.commentNameRequired': 'Name is required.',
+    'post.commentEmailInvalid': 'Please enter a valid email address.',
 
     'footer.copyright': 'Copyright © {year} 皮蛋solo粥',
     'footer.license': 'Licensed under CC BY-NC 4.0',
@@ -170,11 +177,95 @@ export const ui = {
     '404.desc': 'The page you requested may have been removed or never existed.',
     '404.back': 'Back to home',
   },
+  ja: {
+    'site.name': '皮蛋solo粥',
+    'site.tagline': '日常、ランニング、そしてもう一度歩き出す日々。ひとり暮らしの等身大の記録。',
+    'site.description': '普通の人の個人ブログ。日常の雑記、ランニング、日々の気づきを綴る。',
+
+    'nav.home': 'ホーム',
+    'nav.categories': 'カテゴリ',
+    'nav.about': 'About',
+    'nav.archive': 'アーカイブ',
+    'nav.login': 'ログイン',
+
+    'icon.rss': 'RSS 購読',
+    'icon.sitemap': 'サイトマップ',
+    'icon.search': '検索',
+    'icon.login': 'ログイン',
+    'icon.theme': 'ライト / ダーク切替',
+
+    'home.hero.title': '日常の雑記',
+    'home.readMore': '最新記事を読む',
+    'home.latest': '最新記事',
+    'home.empty': 'まだ記事がありません。',
+
+    'widget.quote': '今日のことば',
+    'widget.countdown': 'カウントダウン',
+    'widget.countdownTo': '{label}まで',
+
+    'profile.posts': '記事',
+    'profile.categories': 'カテゴリ',
+    'profile.comments': 'コメント',
+    'profile.visits': '閲覧',
+
+    'about.title': 'About',
+    'about.lead': 'こんにちは、皮蛋solo粥です。',
+    'about.body':
+      'ここには僕の日常——ランニング、ひとり暮らし、ちょっとした気づき——を綴ります。\n\nトレンドを追わず、無理に更新もしません。そのとき本当に書きたいことを書くだけ。記事は中国語が中心ですが、海外の友だちのために英語版も用意しています。',
+
+    'categories.title': 'カテゴリ',
+    'categories.intro': 'テーマ別にすべての記事を眺める。',
+    'categories.count': '全 {n} 件',
+    'categories.empty': 'まだカテゴリがありません。',
+
+    'archive.title': 'アーカイブ',
+    'archive.intro': 'これまでのすべての記事を時系列に。',
+    'archive.count': '全 {n} 件の記事',
+    'archive.empty': 'まだ記事がありません。',
+    'archive.uncategorized': '未分類',
+
+    'search.title': '検索',
+    'search.intro': 'キーワードを入力して、サイト内の記事を検索。',
+    'search.placeholder': 'キーワードを入力…',
+    'search.tip': 'キーワードを入力して検索。',
+    'search.noResults': '該当する記事が見つかりませんでした。',
+    'search.results': '{n} 件の記事が見つかりました',
+    'search.reading': '読み込み中…',
+
+    'post.back': '← ホームへ',
+    'post.filed': 'カテゴリ：',
+    'post.toc': '目次',
+    'post.hot': '人気記事',
+    'post.catDir': 'カテゴリ',
+    'post.words': '約 {n} 文字',
+
+    'post.comments': 'コメント',
+    'post.commentName': 'ニックネーム（必須）',
+    'post.commentEmail': 'メールアドレス（必須）',
+    'post.commentPlaceholder': '何か書いてください…（冷静に、丁寧に）',
+    'post.commentSubmit': 'コメントする',
+    'post.commentSending': '送信中…',
+    'post.commentEmpty': 'まだコメントはありません。最初の一本を。',
+    'post.commentDisabled': 'コメントは無効です（Supabase が未設定）。',
+    'post.commentError': '送信に失敗しました。後ほどお試しください。',
+    'post.commentRequired': 'コメントを入力してください。',
+    'post.commentNameRequired': 'ニックネームは必須です。',
+    'post.commentEmailInvalid': '有効なメールアドレスを入力してください。',
+
+    'footer.copyright': 'Copyright © {year} 皮蛋solo粥',
+    'footer.license': 'Licensed under CC BY-NC 4.0',
+    'footer.powered': 'Powered by Astro',
+    'footer.hosted': 'Hosted by Netlify',
+
+    '404.title': 'ページが見つかりません',
+    '404.desc': 'お探しのページは削除されたか、存在しません。',
+    '404.back': 'ホームへ',
+  },
 };
 
 export function getLangFromUrl(url) {
   const seg = url.pathname.split('/').filter(Boolean)[0];
-  return seg === 'en' ? 'en' : defaultLang;
+  return seg === 'en' || seg === 'ja' ? seg : defaultLang;
 }
 
 export function useTranslations(lang) {
@@ -200,9 +291,10 @@ export function altLang(lang) {
   return lang === 'zh' ? 'en' : 'zh';
 }
 
-// 从当前 pathname 生成「切换到目标语言」的链接（用于导航里的 EN / 中文 按钮）
+// 从当前 pathname 生成「切换到目标语言」的链接（用于导航里的语言菜单）
 export function switchLangPath(pathname, targetLang) {
-  let p = pathname.replace(/^\/en(?=\/|$)/, '');
+  const nonDefault = Object.keys(languages).filter((l) => l !== defaultLang);
+  let p = pathname.replace(new RegExp(`^/(${nonDefault.join('|')})(?=/|$)`), '');
   if (p === '') p = '/';
   return localizePath(p, targetLang);
 }

@@ -17,8 +17,11 @@ const desc = description || t('site.description');
 
 const path = Astro.url.pathname;
 const canonical = Astro.site ? new URL(path, Astro.site).href : path;
-const zhHref = localizePath(path, 'zh');
-const enHref = localizePath(path, 'en');
+// path 是当前已本地化的路径（如 /ja/archive/），需先还原成默认语言基准路径，再分别本地化
+const basePath = path.replace(/^\/(en|ja)(?=\/|$)/, '') || '/';
+const zhHref = localizePath(basePath, 'zh');
+const enHref = localizePath(basePath, 'en');
+const jaHref = localizePath(basePath, 'ja');
 ---
 <!doctype html>
 <html lang={languages[lang].htmlLang}>
@@ -47,6 +50,7 @@ const enHref = localizePath(path, 'en');
 
     <link rel="alternate" hreflang="zh-CN" href={zhHref} />
     <link rel="alternate" hreflang="en" href={enHref} />
+    <link rel="alternate" hreflang="ja" href={jaHref} />
     <link rel="alternate" hreflang="x-default" href={zhHref} />
 
     <link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml" />

@@ -52,25 +52,31 @@ create table if not exists comments (
   id uuid primary key default gen_random_uuid(),
   page text not null,
   author text not null default '匿名',
+  email text not null default '',
   content text not null,
   approved boolean not null default true,
   created_at timestamptz not null default now()
 );
 
+-- 已存在旧表时补列（幂等）
+alter table comments add column if not exists email text not null default '';
+
 create index if not exists comments_page_idx on comments (page, created_at);
 
 alter table comments enable row level security;
 
--- 任何人可读「已审核」评论
+-- 任何人可读「已审核」评论（email 不对外返回，仅作者本人可在后台查看）
 create policy "public read approved comments"
   on comments for select
   using (approved = true);
 
--- 匿名可插入（带长度校验，防明显刷屏）
+-- 匿名可插入（昵称、邮箱、内容均做基本校验；邮箱不公开显示）
 create policy "public insert comments"
   on comments for insert
   with check (
-    char_length(content) between 1 and 1000
-    and char_length(author) between 1 and 40
+    char_length(author) between 1 and 40
+    and char_length(email) <= 120
+    and (email = '' or email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$')
+    and char_length(content) between 1 and 1000
   );
 

@@ -1,14 +1,15 @@
 ---
 import Icon from './Icon.astro';
 import { site } from '../data/site.js';
-import { useTranslations } from '../i18n/ui.js';
+import { useTranslations, localizePath } from '../i18n/ui.js';
 
 const { lang = 'zh', postsCount = 0, catsCount = 0 } = Astro.props;
 const t = useTranslations(lang);
+const L = (p) => localizePath(p, lang);
 const socials = site.socials.filter((s) => s.url);
 const stats = [
-  { num: postsCount, lbl: t('profile.posts') },
-  { num: catsCount, lbl: t('profile.categories') },
+  { num: postsCount, lbl: t('profile.posts'), href: L('/archive/') },
+  { num: catsCount, lbl: t('profile.categories'), href: L('/categories/') },
 ];
 ---
 <aside class="profile-card">
@@ -20,10 +21,10 @@ const stats = [
   <p class="profile-tagline">{site.tagline}</p>
   <div class="profile-stats">
     {stats.map((s) => (
-      <div class="profile-stat">
+      <a class="profile-stat" href={s.href}>
         <div class="num">{s.num}</div>
         <div class="lbl">{s.lbl}</div>
-      </div>
+      </a>
     ))}
   </div>
   {socials.length > 0 && (
