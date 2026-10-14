@@ -1,0 +1,200 @@
+---
+import Icon from './Icon.astro';
+import { useTranslations } from '../i18n/ui.js';
+
+const { lang = 'zh', page } = Astro.props;
+const t = useTranslations(lang);
+// 运行时读浏览器内联的公开 key（构建时由 .env / Netlify 环境变量注入）
+const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.env.PUBLIC_SUPABASE_ANON_KEY);
+---
+{configured ? (
+  <section class="comments" id="comments" data-page={page} data-lang={lang}
+    data-required={t('post.commentRequired')}
+    data-sending={t('post.commentSending')}
+    data-error={t('post.commentError')}>
+    <h2 class="comments-title">
+      <Icon name="comment" size={18} />
+      <span>{t('post.comments')}</span>
+      <span class="comments-count" id="comments-count">0</span>
+    </h2>
+
+    <form class="comments-form" id="comments-form" autocomplete="off">
+      <input
+        class="comments-name"
+        id="comments-name"
+        type="text"
+        maxlength="40"
+        placeholder={t('post.commentName')}
+        aria-label={t('post.commentName')}
+      />
+      <!-- 蜜罐：正常用户看不到也填不了，机器人若填了则静默丢弃 -->
+      <input class="comments-hp" id="comments-hp" type="text" tabindex="-1" aria-hidden="true" autocomplete="off" />
+      <textarea
+        class="comments-input"
+        id="comments-text"
+        maxlength="1000"
+        rows="4"
+        placeholder={t('post.commentPlaceholder')}
+        aria-label={t('post.commentPlaceholder')}
+        required
+      ></textarea>
+      <div class="comments-actions">
+        <span class="comments-msg" id="comments-msg" role="status" aria-live="polite"></span>
+        <button class="comments-submit" id="comments-submit" type="submit">{t('post.commentSubmit')}</button>
+      </div>
+    </form>
+
+    <ul class="comments-list" id="comments-list" aria-live="polite"></ul>
+    <p class="comments-empty" id="comments-empty" hidden>{t('post.commentEmpty')}</p>
+  </section>
+) : (
+  <section class="comments comments-disabled">
+    <p class="comments-note">{t('post.commentDisabled')}</p>
+  </section>
+)}
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL;
+  const SUPABASE_ANON_KEY = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+
+  function fmtDate(iso, lang) {
+    try {
+      return new Date(iso).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit',
+      });
+    } catch (e) { return iso; }
+  }
+
+  function escapeText(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  function renderItem(list, c, lang) {
+    const li = document.createElement('li');
+    li.className = 'comment-item';
+
+    const head = document.createElement('div');
+    head.className = 'comment-head';
+
+    const name = document.createElement('span');
+    name.className = 'comment-author';
+    name.textContent = c.author || '匿名';
+
+    const time = document.createElement('span');
+    time.className = 'comment-time';
+    time.textContent = fmtDate(c.created_at, lang);
+
+    head.appendChild(name);
+    head.appendChild(time);
+
+    const body = document.createElement('p');
+    body.className = 'comment-body';
+    body.textContent = c.content || '';
+
+    li.appendChild(head);
+    li.appendChild(body);
+    list.appendChild(li);
+  }
+
+  async function main() {
+    const root = document.getElementById('comments');
+    if (!root) return;
+    const page = root.dataset.page || '';
+    const lang = root.dataset.lang || 'zh';
+    const tRequired = root.dataset.required || '评论内容不能为空。';
+    const tSending = root.dataset.sending || '发送中…';
+    const tError = root.dataset.error || '评论发送失败，请稍后重试。';
+
+    const form = document.getElementById('comments-form');
+    const nameEl = document.getElementById('comments-name');
+    const hpEl = document.getElementById('comments-hp');
+    const textEl = document.getElementById('comments-text');
+    const submitBtn = document.getElementById('comments-submit');
+    const msgEl = document.getElementById('comments-msg');
+    const listEl = document.getElementById('comments-list');
+    const emptyEl = document.getElementById('comments-empty');
+    const countEl = document.getElementById('comments-count');
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false },
+    });
+
+    async function load() {
+      const { data, error } = await supabase
+        .from('comments')
+        .select('id, author, content, created_at')
+        .eq('page', page)
+        .eq('approved', true)
+        .order('created_at', { ascending: true });
+      if (error) { console.warn('[comments] load failed', error.message); return; }
+      listEl.innerHTML = '';
+      const rows = data || [];
+      rows.forEach((c) => renderItem(listEl, c, lang));
+      countEl.textContent = String(rows.length);
+      emptyEl.hidden = rows.length > 0;
+    }
+
+    // 实时：别人发的新评论自动出现（仅已审核）
+    const channel = supabase
+      .channel('comments:' + page)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'comments',
+        filter: 'page=eq.' + page,
+      }, (payload) => {
+        const c = payload.new;
+        if (c && c.approved) {
+          renderItem(listEl, c, lang);
+          countEl.textContent = String(Number(countEl.textContent || '0') + 1);
+          emptyEl.hidden = true;
+        }
+      })
+      .subscribe();
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msgEl.textContent = '';
+      msgEl.className = 'comments-msg';
+      // 蜜罐命中：假装成功，直接丢弃
+      if (hpEl.value) { form.reset(); return; }
+
+      const content = (textEl.value || '').trim();
+      const author = (nameEl.value || '').trim() || '匿名';
+      if (!content) {
+        msgEl.textContent = tRequired;
+        msgEl.className = 'comments-msg comments-msg-err';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      const original = submitBtn.textContent;
+      submitBtn.textContent = tSending;
+
+      const { error } = await supabase
+        .from('comments')
+        .insert({ page, author: author.slice(0, 40), content: content.slice(0, 1000) });
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = original;
+
+      if (error) {
+        console.warn('[comments] insert failed', error.message);
+        msgEl.textContent = tError;
+        msgEl.className = 'comments-msg comments-msg-err';
+        return;
+      }
+      textEl.value = '';
+      msgEl.textContent = '';
+      // 默认 approved=true 时实时订阅会补上；这里主动刷新一次兜底
+      await load();
+    });
+
+    await load();
+  }
+
+  main();
+</script>

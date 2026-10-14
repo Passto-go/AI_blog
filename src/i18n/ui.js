@@ -70,6 +70,16 @@ export const ui = {
     'post.catDir': '分类目录',
     'post.words': '约 {n} 字',
 
+    'post.comments': '评论',
+    'post.commentName': '昵称（可选）',
+    'post.commentPlaceholder': '说点什么吧…（理性发言，友善交流）',
+    'post.commentSubmit': '发表评论',
+    'post.commentSending': '发送中…',
+    'post.commentEmpty': '还没有评论，来抢沙发吧。',
+    'post.commentDisabled': '评论功能未启用（站点未配置 Supabase）。',
+    'post.commentError': '评论发送失败，请稍后重试。',
+    'post.commentRequired': '评论内容不能为空哦。',
+
     'footer.copyright': 'Copyright © {year} 皮蛋solo粥',
     'footer.license': 'Licensed under CC BY-NC 4.0',
     'footer.powered': 'Powered by Astro',
@@ -140,6 +150,16 @@ export const ui = {
     'post.hot': 'Popular',
     'post.catDir': 'Categories',
     'post.words': '~{n} words',
+
+    'post.comments': 'Comments',
+    'post.commentName': 'Name (optional)',
+    'post.commentPlaceholder': 'Say something… (be kind, be civil)',
+    'post.commentSubmit': 'Post comment',
+    'post.commentSending': 'Sending…',
+    'post.commentEmpty': 'No comments yet — be the first.',
+    'post.commentDisabled': 'Comments are disabled (Supabase not configured).',
+    'post.commentError': 'Failed to post. Please try again later.',
+    'post.commentRequired': 'Comment cannot be empty.',
 
     'footer.copyright': 'Copyright © {year} 皮蛋solo粥',
     'footer.license': 'Licensed under CC BY-NC 4.0',

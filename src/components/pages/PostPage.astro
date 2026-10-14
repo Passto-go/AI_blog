@@ -7,6 +7,7 @@ import ProfileCard from '../ProfileCard.astro';
 import Toc from '../Toc.astro';
 import TodayQuote from '../TodayQuote.astro';
 import Countdown from '../Countdown.astro';
+import Comments from '../Comments.astro';
 
 const { lang, post } = Astro.props;
 const t = useTranslations(lang);
@@ -19,6 +20,7 @@ const hot = allPosts.filter((p) => p.slug !== post.slug).slice(0, 4);
 const cats = await getCategories(lang);
 const wordCount = (post.content || '').replace(/\s+/g, '').length;
 const idx = allPosts.findIndex((p) => p.slug === post.slug);
+const pagePath = localizePath(`/posts/${post.slug}/`, lang);
 const prevPost = idx > 0 ? allPosts[idx - 1] : null;
 const nextPost = idx > -1 && idx < allPosts.length - 1 ? allPosts[idx + 1] : null;
 ---
@@ -44,6 +46,7 @@ const nextPost = idx > -1 && idx < allPosts.length - 1 ? allPosts[idx + 1] : nul
     <article class="post-main">
       {post.excerpt && <p class="post-lead">{post.excerpt}</p>}
       <div class="content" set:html={html} />
+      <Comments lang={lang} page={pagePath} />
       <p class="back"><a href={localizePath('/', lang)}>{t('post.back')}</a></p>
     </article>
 
