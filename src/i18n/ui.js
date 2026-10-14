@@ -98,6 +98,8 @@ export const ui = {
     'post.commentRequired': '评论内容不能为空哦。',
     'post.commentNameRequired': '昵称不能为空。',
     'post.commentEmailInvalid': '请输入有效的邮箱地址。',
+    'post.commentLoadFailed': '评论加载失败',
+    'post.commentRetry': '重试',
 
     'footer.copyright': 'Copyright © {year} 皮蛋solo粥',
     'footer.license': 'Licensed under CC BY-NC 4.0',
@@ -197,6 +199,8 @@ export const ui = {
     'post.commentRequired': 'Comment cannot be empty.',
     'post.commentNameRequired': 'Name is required.',
     'post.commentEmailInvalid': 'Please enter a valid email address.',
+    'post.commentLoadFailed': 'Failed to load comments',
+    'post.commentRetry': 'Retry',
 
     'footer.copyright': 'Copyright © {year} 皮蛋solo粥',
     'footer.license': 'Licensed under CC BY-NC 4.0',
@@ -296,6 +300,8 @@ export const ui = {
     'post.commentRequired': 'コメントを入力してください。',
     'post.commentNameRequired': 'ニックネームは必須です。',
     'post.commentEmailInvalid': '有効なメールアドレスを入力してください。',
+    'post.commentLoadFailed': 'コメントの読み込みに失敗しました',
+    'post.commentRetry': '再試行',
 
     'footer.copyright': 'Copyright © {year} 皮蛋solo粥',
     'footer.license': 'Licensed under CC BY-NC 4.0',

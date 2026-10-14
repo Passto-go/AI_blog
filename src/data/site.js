@@ -22,8 +22,8 @@ export const site = {
   // 社交入口（资料卡底部）：icon 名称见 src/components/Icon.astro（github/email/rss/wechat/tiktok/link）
   // url 留空则该图标不显示
   socials: [
-    { icon: 'github', label: 'GitHub', url: 'https://github.com/' },
-    { icon: 'email', label: 'Email', url: 'mailto:you@example.com' },
+    { icon: 'github', label: 'GitHub', url: 'https://github.com/Passto-go' },
+    { icon: 'email', label: 'Email', url: 'mailto:intl1024@outlook.com' },
     { icon: 'rss', label: 'RSS', url: '/rss.xml' },
     { icon: 'wechat', label: '微信', url: '' },
     { icon: 'tiktok', label: '抖音', url: '' },

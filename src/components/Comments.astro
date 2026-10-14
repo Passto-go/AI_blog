@@ -13,7 +13,9 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     data-sending={t('post.commentSending')}
     data-error={t('post.commentError')}
     data-name-required={t('post.commentNameRequired')}
-    data-email-invalid={t('post.commentEmailInvalid')}>
+    data-email-invalid={t('post.commentEmailInvalid')}
+    data-load-failed={t('post.commentLoadFailed')}
+    data-retry={t('post.commentRetry')}>
     <h2 class="comments-title">
       <Icon name="comment" size={18} />
       <span>{t('post.comments')}</span>
@@ -60,6 +62,7 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
 
     <ul class="comments-list" id="comments-list" aria-live="polite"></ul>
     <p class="comments-empty" id="comments-empty" hidden>{t('post.commentEmpty')}</p>
+    <p class="comments-error" id="comments-error" hidden role="alert"></p>
   </section>
 ) : (
   <section class="comments comments-disabled">
@@ -74,18 +77,13 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
   const SUPABASE_ANON_KEY = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
   function fmtDate(iso, lang) {
+    const locale = lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja-JP' : 'en-US';
     try {
-      return new Date(iso).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US', {
+      return new Date(iso).toLocaleString(locale, {
         year: 'numeric', month: '2-digit', day: '2-digit',
         hour: '2-digit', minute: '2-digit',
       });
     } catch (e) { return iso; }
-  }
-
-  function escapeText(s) {
-    const d = document.createElement('div');
-    d.textContent = s == null ? '' : String(s);
-    return d.innerHTML;
   }
 
   function renderItem(list, c, lang) {
@@ -125,6 +123,8 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     const tError = root.dataset.error || '评论发送失败，请稍后重试。';
     const tNameRequired = root.dataset.nameRequired || '昵称不能为空。';
     const tEmailInvalid = root.dataset.emailInvalid || '请输入有效的邮箱地址。';
+    const tLoadFailed = root.dataset.loadFailed || '评论加载失败';
+    const tRetry = root.dataset.retry || '重试';
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     const form = document.getElementById('comments-form');
@@ -136,42 +136,81 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     const msgEl = document.getElementById('comments-msg');
     const listEl = document.getElementById('comments-list');
     const emptyEl = document.getElementById('comments-empty');
+    const errEl = document.getElementById('comments-error');
     const countEl = document.getElementById('comments-count');
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { persistSession: false },
     });
 
-    async function load() {
-      const { data, error } = await supabase
-        .from('comments')
-        .select('id, author, content, created_at')
-        .eq('page', page)
-        .eq('approved', true)
-        .order('created_at', { ascending: true });
-      if (error) { console.warn('[comments] load failed', error.message); return; }
-      listEl.innerHTML = '';
-      const rows = data || [];
-      rows.forEach((c) => renderItem(listEl, c, lang));
-      countEl.textContent = String(rows.length);
-      emptyEl.hidden = rows.length > 0;
+    // 读取失败时把真实错误显示出来（表不存在 / RLS / key 错误都能一眼看出），并提供重试
+    function showListError(msg) {
+      if (!errEl) return;
+      emptyEl.hidden = true;
+      errEl.hidden = false;
+      errEl.textContent = tLoadFailed + (msg ? '：' + msg : '');
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'comments-retry';
+      retry.textContent = tRetry;
+      retry.addEventListener('click', function () { load(); });
+      errEl.appendChild(document.createTextNode(' '));
+      errEl.appendChild(retry);
+    }
+    function hideListError() {
+      if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
     }
 
-    // 实时：别人发的新评论自动出现（仅已审核）
-    const channel = supabase
-      .channel('comments:' + page)
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'comments',
-        filter: 'page=eq.' + page,
-      }, (payload) => {
-        const c = payload.new;
-        if (c && c.approved) {
-          renderItem(listEl, c, lang);
-          countEl.textContent = String(Number(countEl.textContent || '0') + 1);
-          emptyEl.hidden = true;
+    async function load() {
+      try {
+        const { data, error } = await supabase
+          .from('comments')
+          .select('id, author, content, created_at')
+          .eq('page', page)
+          .eq('approved', true)
+          .order('created_at', { ascending: true });
+        if (error) {
+          console.warn('[comments] load failed', error.message);
+          showListError(error.message);
+          return;
         }
-      })
-      .subscribe();
+        hideListError();
+        listEl.innerHTML = '';
+        const rows = data || [];
+        rows.forEach((c) => renderItem(listEl, c, lang));
+        countEl.textContent = String(rows.length);
+        emptyEl.hidden = rows.length > 0;
+      } catch (e) {
+        // supabase-js 在网络层失败（断网/被墙/CORS/项目暂停）时会直接 throw 而非返回 error，
+        // 若不捕获会让整个评论区静默死亡——这里兜住并显示真实原因
+        console.warn('[comments] load threw', e);
+        showListError((e && e.message) || String(e));
+      }
+    }
+
+    // 实时：别人发的新评论自动出现（仅已审核）；订阅失败不影响评论显示
+    try {
+      const channel = supabase
+        .channel('comments:' + page)
+        .on('postgres_changes', {
+          event: 'INSERT', schema: 'public', table: 'comments',
+          filter: 'page=eq.' + page,
+        }, (payload) => {
+          const c = payload.new;
+          if (c && c.approved) {
+            renderItem(listEl, c, lang);
+            countEl.textContent = String(Number(countEl.textContent || '0') + 1);
+            emptyEl.hidden = true;
+          }
+        })
+        .subscribe(function (status) {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn('[comments] realtime 订阅失败（不影响显示，刷新页面即可）');
+          }
+        });
+    } catch (e) {
+      console.warn('[comments] realtime 订阅异常（不影响显示）', e);
+    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -204,23 +243,31 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
       const original = submitBtn.textContent;
       submitBtn.textContent = tSending;
 
-      const { error } = await supabase
-        .from('comments')
-        .insert({
-          page,
-          author: author.slice(0, 40),
-          email: email.slice(0, 120),
-          content: content.slice(0, 1000),
-        });
+      try {
+        const { error } = await supabase
+          .from('comments')
+          .insert({
+            page,
+            author: author.slice(0, 40),
+            email: email.slice(0, 120),
+            content: content.slice(0, 1000),
+          });
 
-      submitBtn.disabled = false;
-      submitBtn.textContent = original;
-
-      if (error) {
-        console.warn('[comments] insert failed', error.message);
-        msgEl.textContent = tError;
+        if (error) {
+          console.warn('[comments] insert failed', error.message);
+          msgEl.textContent = tError + (error.message ? '：' + error.message : '');
+          msgEl.className = 'comments-msg comments-msg-err';
+          return;
+        }
+      } catch (e) {
+        // 网络层失败时 supabase-js 会 throw；显示真实原因便于排查
+        console.warn('[comments] insert threw', e);
+        msgEl.textContent = tError + '：' + ((e && e.message) || String(e));
         msgEl.className = 'comments-msg comments-msg-err';
         return;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = original;
       }
       textEl.value = '';
       msgEl.textContent = '';
@@ -231,5 +278,18 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     await load();
   }
 
-  main();
+  main().catch(function (e) {
+    // 最终兜底：任何未预期异常都不应让评论区静默死亡
+    console.warn('[comments] main threw', e);
+    var root = document.getElementById('comments');
+    if (!root) return;
+    var errEl = document.getElementById('comments-error');
+    var emptyEl = document.getElementById('comments-empty');
+    if (errEl) {
+      if (emptyEl) emptyEl.hidden = true;
+      errEl.hidden = false;
+      errEl.textContent = (root.dataset.loadFailed || '评论加载失败') +
+        '：' + ((e && e.message) || String(e));
+    }
+  });
 </script>

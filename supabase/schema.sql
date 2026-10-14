@@ -80,3 +80,20 @@ create policy "public insert comments"
     and char_length(content) between 1 and 1000
   );
 
+-- 开启 Realtime：让新评论无需刷新即出现（幂等，重复执行不报错；
+-- 若提示 publication 不存在说明该项目未启用 Realtime，可忽略，评论功能不受影响）
+do $$
+begin
+  alter publication supabase_realtime add table comments;
+exception
+  when duplicate_object then null;   -- 已在发布中
+  when undefined_object then null;   -- 该项目无该 publication
+end $$;
+
+-- ============================================================
+-- 自查（可选）：执行后应返回 2 行（select + insert 两条策略）
+--   select policyname from pg_policies where tablename = 'comments';
+-- 确认表已启用实时：
+--   select * from pg_publication_tables where pubname = 'supabase_realtime';
+-- ============================================================
+
