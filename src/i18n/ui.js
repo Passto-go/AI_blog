@@ -111,6 +111,17 @@ export const ui = {
     'post.commentDelete': '删除',
     'post.commentDeleteConfirm': '确定删除这条评论吗？此操作不可恢复。',
     'post.commentDeleted': '已删除',
+    'post.commentTokenMissing': '注意：未能保存删除凭证，日后可能无法删除此评论。',
+
+    // 无译文提示（文章页横幅）：当前语言缺已发布译文时说明现状
+    'article.missingEn': '本文暂无英文版。',
+    'article.missingEnJa': '本文暂无英文版与日文版。',
+    'article.missingJa': '本文暂无日文版。',
+    'article.missingJaEn': '本文暂无日文版与英文版。',
+    'article.readJa': '阅读日文版 →',
+    'article.readEn': '阅读英文版 →',
+    'article.showingZh': '当前展示的是中文原文。',
+    'article.showingEn': '当前展示的是英文版。',
 
     'footer.copyright': 'Copyright © {year} 老一贯',
     'footer.license': 'Licensed under CC BY-NC 4.0',
@@ -223,6 +234,17 @@ export const ui = {
     'post.commentDelete': 'Delete',
     'post.commentDeleteConfirm': 'Delete this comment? This cannot be undone.',
     'post.commentDeleted': 'Deleted',
+    'post.commentTokenMissing': 'Note: the deletion token was not saved — you may be unable to delete this comment later.',
+
+    // Translation notice (article banner): shown when the current language has no published version
+    'article.missingEn': 'This article is not yet available in English.',
+    'article.missingEnJa': 'This article is not yet available in English or Japanese.',
+    'article.missingJa': 'This article is not yet available in Japanese.',
+    'article.missingJaEn': 'This article is not yet available in Japanese or English.',
+    'article.readJa': 'Read the Japanese version →',
+    'article.readEn': 'Read the English version →',
+    'article.showingZh': 'You are reading the Chinese original.',
+    'article.showingEn': 'You are reading the English version.',
 
     'footer.copyright': 'Copyright © {year} 老一贯',
     'footer.license': 'Licensed under CC BY-NC 4.0',
@@ -335,6 +357,17 @@ export const ui = {
     'post.commentDelete': '削除',
     'post.commentDeleteConfirm': 'このコメントを削除しますか？元に戻せません。',
     'post.commentDeleted': '削除しました',
+    'post.commentTokenMissing': '注意：削除トークンを保存できませんでした。後からこのコメントを削除できない可能性があります。',
+
+    // 翻訳なし告知（記事ページのバナー）：現在の言語に公開済み訳がない場合に现状を説明
+    'article.missingEn': 'この記事にはまだ英語版がありません。',
+    'article.missingEnJa': 'この記事にはまだ英語版と日本語版がありません。',
+    'article.missingJa': 'この記事にはまだ日本語版がありません。',
+    'article.missingJaEn': 'この記事にはまだ日本語版と英語版がありません。',
+    'article.readJa': '日本語版を読む →',
+    'article.readEn': '英語版を読む →',
+    'article.showingZh': '現在中国語版を表示しています。',
+    'article.showingEn': '現在英語版を表示しています。',
 
     'footer.copyright': 'Copyright © {year} 老一贯',
     'footer.license': 'Licensed under CC BY-NC 4.0',

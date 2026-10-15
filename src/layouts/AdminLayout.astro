@@ -1,0 +1,37 @@
+---
+// 写作后台专用布局：自带 html 外壳与主题脚本，不套前台 Header/Footer/Nav。
+// 后台与前台是不同页面，顶部那条前台导航条在此不出现（对应「后台独立页面」方案）。
+const { title = '写作后台', description = '登录后在线撰写与发布文章' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script is:inline>
+      // 昼夜自动主题：优先用用户手动选择；否则按本地时间（19:00–07:00 为夜间）
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme');
+          var theme = saved;
+          if (theme !== 'light' && theme !== 'dark') {
+            var h = new Date().getHours();
+            theme = (h >= 19 || h < 7) ? 'dark' : 'light';
+          }
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="admin-body">
+    <main class="admin-main">
+      <slot />
+    </main>
+  </body>
+</html>

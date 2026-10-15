@@ -107,6 +107,55 @@ export async function getPost(slug, lang = 'zh') {
   );
 }
 
+// 文章组内某语言「有已发布译文」的判定（兼容双约定）：
+//   · 外语：lang 字段匹配，或 slug 为 base-语言（后台未设语言时 lang 常为默认 'zh'）
+//   · 中文：只认 base slug 且 lang 为 zh（不能靠 lang 字段——后缀约定的英文版 lang 也是 'zh'）
+export function hasVersion(group, base, lang) {
+  if (lang === 'zh') {
+    return group.some((x) => x.slug === base && (x.lang || 'zh') === 'zh');
+  }
+  return group.some((x) => (x.lang || 'zh') === lang || x.slug === `${base}-${lang}`);
+}
+
+// 正文语言级联（详情页用）：
+//   目标语言有译文 → 目标；否则（目标≠en 且有英文译文）→ 英文；否则中文原文。
+//   刻意不对称：英语缺失只退中文（对英语读者退日文更冷门）；
+//   日语缺失先退英文（日本读者英语接受度最高，且英文版是「次优成品」）。
+export function pickDisplayLang(group, base, lang) {
+  if (hasVersion(group, base, lang)) return lang;
+  if (lang !== 'en' && hasVersion(group, base, 'en')) return 'en';
+  if (hasVersion(group, base, 'zh')) return 'zh';
+  return null;
+}
+
+// 文章详情专用：返回当前语言应展示的版本 + 各语言可用性 + 译文兄弟链接。
+// available 只认已发布版本（fetchAll 已过滤 published），草稿译文对读者视为不存在。
+export async function getPostWithVersions(slug, lang = 'zh') {
+  const all = (await fetchAll()).map(normalize);
+  const base = baseSlug(slug);
+  const group = all.filter((x) => baseSlug(x.slug) === base);
+  if (!group.length) return null;
+
+  const versionSlug = (l) => {
+    const row =
+      l === 'zh'
+        ? group.find((x) => x.slug === base && (x.lang || 'zh') === 'zh')
+        : group.find((x) => (x.lang || 'zh') === l || x.slug === `${base}-${l}`);
+    return row ? row.slug : null;
+  };
+
+  const available = { en: hasVersion(group, base, 'en'), ja: hasVersion(group, base, 'ja') };
+  const displayLang = pickDisplayLang(group, base, lang);
+  const post = (displayLang && pickLangVersion(group, displayLang)) || group[0];
+  return {
+    post,
+    displayLang: displayLang || 'zh',
+    available,
+    siblings: { en: versionSlug('en'), ja: versionSlug('ja') },
+    base,
+  };
+}
+
 // 读取站点动态配置（如倒计时）。表不存在 / 未配置时返回 null，调用方回退默认值。
 export async function getSetting(key) {
   if (!URL || !KEY) return null;
@@ -142,6 +191,21 @@ export async function getCategories(lang = 'zh') {
 export async function getPostsByCategory(slug, lang = 'zh') {
   const posts = await getPosts(lang);
   return posts.filter((p) => (p.categorySlug || 'uncategorized') === slug);
+}
+
+// 旧分类 slug → 新 slug 的 301 映射（重命名分类时写入）。前台分类页 SSR 用 anon key 查询。
+export async function getCategoryAlias(oldSlug) {
+  try {
+    const supabase = createClient(URL, KEY, { auth: { persistSession: false } });
+    const { data } = await supabase
+      .from('category_aliases')
+      .select('new_slug')
+      .eq('old_slug', oldSlug)
+      .maybeSingle();
+    return data?.new_slug || null;
+  } catch {
+    return null;
+  }
 }
 
 export function slugify(str) {

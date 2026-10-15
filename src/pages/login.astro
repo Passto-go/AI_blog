@@ -1,11 +1,11 @@
 ---
-import Base from '../layouts/Base.astro';
+import AdminLayout from '../layouts/AdminLayout.astro';
 
 // 纯客户端应用（supabase-js 在浏览器里运行），无需 SSR，预渲染为静态页
 export const prerender = true;
 ---
 
-<Base lang="zh" title="写作后台" description="登录后在线撰写与发布文章">
+<AdminLayout title="写作后台" description="登录后在线撰写与发布文章">
   <div class="wb">
 
     <!-- ============ 未登录 ============ -->
@@ -37,93 +37,126 @@ export const prerender = true;
           <span id="wb-user" class="wb-user"></span>
         </div>
         <div class="wb-top-right">
-          <button id="logout-btn" class="btn btn-ghost" type="button">退出</button>
+          <a class="wb-mini-link" href="/" target="_blank" rel="noopener" title="在新标签页打开站点首页">查看站点 ↗</a>
+          <button id="logout-btn" class="wb-mini-btn" type="button">退出</button>
         </div>
       </header>
 
-      <div class="wb-grid">
-        <!-- ---------- 编辑列 ---------- -->
-        <div class="wb-main">
-          <div class="wb-card">
-            <input id="f-title" class="wb-title" placeholder="文章标题" />
+      <!-- 模块导航：写作管理 / 评论管理 / 其他功能 -->
+      <nav class="wb-modnav" id="wb-modnav">
+        <button type="button" data-mod="write" class="on">写作管理</button>
+        <button type="button" data-mod="comments">评论管理</button>
+        <button type="button" data-mod="misc">其他功能</button>
+      </nav>
 
-            <div class="wb-meta">
-              <div class="wb-seg" id="f-lang" role="group" aria-label="语言">
-                <button type="button" data-v="zh" class="on">中文</button>
-                <button type="button" data-v="en">EN</button>
-                <button type="button" data-v="ja">日本語</button>
+      <!-- ============ 模块一：写作管理 ============ -->
+      <section id="mod-write" class="wb-module">
+        <div class="wb-grid">
+          <!-- ---------- 编辑列 ---------- -->
+          <div class="wb-main">
+            <div class="wb-card">
+              <input id="f-title" class="wb-title" placeholder="文章标题" />
+
+              <div class="wb-meta">
+                <div class="wb-seg" id="f-lang" role="group" aria-label="语言">
+                  <button type="button" data-v="zh" class="on">中文</button>
+                  <button type="button" data-v="en">EN</button>
+                  <button type="button" data-v="ja">日本語</button>
+                </div>
+                <input id="f-category" class="wb-cat" list="cat-list" placeholder="分类（可选）" />
+                <datalist id="cat-list"></datalist>
+                <div class="wb-seg" id="f-status" role="group" aria-label="状态">
+                  <button type="button" data-v="draft" class="on">草稿</button>
+                  <button type="button" data-v="published">已发布</button>
+                </div>
               </div>
-              <input id="f-category" class="wb-cat" list="cat-list" placeholder="分类（可选）" />
-              <datalist id="cat-list"></datalist>
-              <div class="wb-seg" id="f-status" role="group" aria-label="状态">
-                <button type="button" data-v="draft" class="on">草稿</button>
-                <button type="button" data-v="published">已发布</button>
+
+              <div class="wb-tabs" id="wb-tabs">
+                <button type="button" data-tab="edit" class="on">编辑</button>
+                <button type="button" data-tab="preview">预览</button>
+                <button type="button" data-tab="split">分屏</button>
               </div>
-            </div>
 
-            <div class="wb-tabs" id="wb-tabs">
-              <button type="button" data-tab="edit" class="on">编辑</button>
-              <button type="button" data-tab="preview">预览</button>
-              <button type="button" data-tab="split">分屏</button>
-            </div>
-
-            <div class="wb-editor" id="wb-editor" data-tab="edit">
-              <textarea id="f-content" placeholder="用 Markdown 写作…&#10;&#10;# 二级标题&#10;正文、**加粗**、`代码`、![图片](https://…)"></textarea>
-              <div id="preview" class="wb-preview content"></div>
-            </div>
-
-            <div class="wb-toolbar">
-              <label class="wb-upload" title="上传图片到 Supabase 存储并插入正文">
-                插图
-                <input id="f-image" type="file" accept="image/*" multiple hidden />
-              </label>
-              <span id="upload-msg" class="wb-hint"></span>
-            </div>
-
-            <div class="wb-trbar">
-              <span class="wb-trbar-label">一键翻译</span>
-              <button id="tr-en-btn" class="wb-tr-btn" type="button" title="把当前文章译成英文并填入编辑器，检查后发布即创建/更新英文版">译成英文</button>
-              <button id="tr-ja-btn" class="wb-tr-btn" type="button" title="把当前文章译成日文并填入编辑器，检查后发布即创建/更新日文版">译成日文</button>
-              <span id="lang-state" class="wb-langstate"></span>
-              <span id="tr-msg" class="wb-hint"></span>
-            </div>
-
-            <details class="wb-more">
-              <summary>更多设置（Slug / 摘要 / 封面）</summary>
-              <div class="wb-more-body">
-                <label>Slug<input id="f-slug" placeholder="留空自动生成" /><small id="slug-hint" class="wb-hint"></small></label>
-                <label>摘要<input id="f-excerpt" placeholder="一句话摘要" /></label>
-                <label>封面 URL<input id="f-cover" placeholder="https://…" /></label>
-                <label>分类 Slug<input id="f-catslug" placeholder="留空自动生成" /></label>
+              <div class="wb-editor" id="wb-editor" data-tab="edit">
+                <textarea id="f-content" placeholder="用 Markdown 写作…&#10;&#10;# 二级标题&#10;正文、**加粗**、`代码`、![图片](https://…)"></textarea>
+                <div id="preview" class="wb-preview content"></div>
               </div>
-            </details>
 
-            <div class="wb-actions">
-              <button id="save-draft-btn" class="btn btn-ghost" type="button">存草稿</button>
-              <button id="publish-btn" class="btn" type="button">发布并上线</button>
-              <button id="new-btn" class="btn btn-ghost" type="button">新建</button>
-              <button id="delete-btn" class="btn btn-danger" type="button" hidden>删除</button>
-              <span id="save-msg" class="wb-hint"></span>
+              <div class="wb-toolbar">
+                <label class="wb-upload" title="上传图片到 Supabase 存储并插入正文">
+                  插图
+                  <input id="f-image" type="file" accept="image/*" multiple hidden />
+                </label>
+                <span id="upload-msg" class="wb-hint"></span>
+              </div>
+
+              <div class="wb-trbar">
+                <span class="wb-trbar-label">一键翻译</span>
+                <button id="tr-en-btn" class="wb-tr-btn" type="button" title="把当前文章译成英文并填入编辑器，检查后发布即创建/更新英文版">译成英文</button>
+                <button id="tr-ja-btn" class="wb-tr-btn" type="button" title="把当前文章译成日文并填入编辑器，检查后发布即创建/更新日文版">译成日文</button>
+                <span id="lang-state" class="wb-langstate"></span>
+                <span id="tr-msg" class="wb-hint"></span>
+              </div>
+
+              <details class="wb-more">
+                <summary>更多设置（Slug / 摘要 / 封面）</summary>
+                <div class="wb-more-body">
+                  <label>Slug<input id="f-slug" placeholder="留空自动生成" /><small id="slug-hint" class="wb-hint"></small></label>
+                  <label>摘要<input id="f-excerpt" placeholder="一句话摘要" /></label>
+                  <label>封面 URL<input id="f-cover" placeholder="https://…" /></label>
+                  <label>分类 Slug<input id="f-catslug" placeholder="留空自动生成" /></label>
+                </div>
+              </details>
+
+              <div class="wb-actions">
+                <button id="save-draft-btn" class="btn btn-ghost" type="button">存草稿</button>
+                <button id="publish-btn" class="btn" type="button">发布并上线</button>
+                <button id="new-btn" class="btn btn-ghost" type="button">新建</button>
+                <button id="delete-btn" class="btn btn-danger" type="button" hidden>删除</button>
+                <span id="save-msg" class="wb-hint"></span>
+              </div>
             </div>
           </div>
+
+          <!-- ---------- 列表列 ---------- -->
+          <aside class="wb-side">
+            <div class="wb-card">
+              <div class="wb-side-head">
+                <strong>文章</strong>
+                <span id="wb-count" class="wb-hint"></span>
+              </div>
+              <input id="wb-search" class="wb-search" type="search" placeholder="搜索标题…" />
+              <div class="wb-filter" id="wb-filter">
+                <button type="button" data-f="all" class="on">全部</button>
+                <button type="button" data-f="published">已发布</button>
+                <button type="button" data-f="draft">草稿</button>
+              </div>
+              <ul id="post-list" class="wb-list"></ul>
+            </div>
+          </aside>
         </div>
+      </section>
 
-        <!-- ---------- 列表列 ---------- -->
-        <aside class="wb-side">
-          <div class="wb-card">
-            <div class="wb-side-head">
-              <strong>文章</strong>
-              <span id="wb-count" class="wb-hint"></span>
-            </div>
-            <input id="wb-search" class="wb-search" type="search" placeholder="搜索标题…" />
-            <div class="wb-filter" id="wb-filter">
-              <button type="button" data-f="all" class="on">全部</button>
-              <button type="button" data-f="published">已发布</button>
-              <button type="button" data-f="draft">草稿</button>
-            </div>
-            <ul id="post-list" class="wb-list"></ul>
+      <!-- ============ 模块二：评论管理 ============ -->
+      <section id="mod-comments" class="wb-module" hidden>
+        <div class="wb-card" id="cm-card">
+          <div class="wb-side-head">
+            <strong>评论管理</strong>
+            <span id="cm-count" class="wb-hint"></span>
           </div>
+          <div class="wb-filter" id="cm-filter">
+            <button type="button" data-f="all" class="on">全部</button>
+            <button type="button" data-f="pending">待审核</button>
+            <button type="button" data-f="approved">已通过</button>
+            <button type="button" data-f="rejected">未通过</button>
+          </div>
+          <ul id="cm-list" class="wb-list"></ul>
+        </div>
+      </section>
 
+      <!-- ============ 模块三：其他功能 ============ -->
+      <section id="mod-misc" class="wb-module" hidden>
+        <div class="wb-grid-misc">
           <div class="wb-card" id="cd-card">
             <div class="wb-side-head"><strong>首页倒计时</strong></div>
             <label class="wb-field">名称<input id="cd-name" placeholder="如：元旦" /></label>
@@ -132,24 +165,19 @@ export const prerender = true;
             <span id="cd-msg" class="wb-hint"></span>
           </div>
 
-          <div class="wb-card" id="cm-card">
+          <div class="wb-card" id="cat-card">
             <div class="wb-side-head">
-              <strong>评论管理</strong>
-              <span id="cm-count" class="wb-hint"></span>
+              <strong>分类管理</strong>
+              <span id="cat-count" class="wb-hint"></span>
             </div>
-            <div class="wb-filter" id="cm-filter">
-              <button type="button" data-f="all" class="on">全部</button>
-              <button type="button" data-f="pending">待审核</button>
-              <button type="button" data-f="approved">已通过</button>
-              <button type="button" data-f="rejected">未通过</button>
-            </div>
-            <ul id="cm-list" class="wb-list"></ul>
+            <p class="wb-hint wb-cat-note">重命名会同步修改该分类下所有文章的分类名与 URL（slug）；改名后旧的分类链接将失效。</p>
+            <ul id="cat-list-manage" class="wb-list"></ul>
           </div>
-        </aside>
-      </div>
+        </div>
+      </section>
     </section>
   </div>
-</Base>
+</AdminLayout>
 
 <script>
   import { createClient } from '@supabase/supabase-js';
@@ -195,6 +223,18 @@ export const prerender = true;
     await loadList();
     loadCountdown();
     loadComments();
+  }
+
+  // ---------- 模块切换（写作管理 / 评论管理 / 其他功能） ----------
+  const MODULES = ['write', 'comments', 'misc'];
+  function switchModule(name) {
+    if (!MODULES.includes(name)) return;
+    MODULES.forEach((m) => { $('mod-' + m).hidden = m !== name; });
+    document.querySelectorAll('#wb-modnav [data-mod]').forEach((b) => {
+      b.classList.toggle('on', b.dataset.mod === name);
+    });
+    if (name === 'comments') loadComments();
+    if (name === 'misc') { loadCountdown(); loadCatManage(); }
   }
 
   // ---------- 首页倒计时（存于 site_settings） ----------
@@ -367,6 +407,191 @@ export const prerender = true;
       .from('comments').update({ approved, rejected }).eq('id', id);
     if (error) { alert('操作失败：' + error.message); return; }
     await loadComments();
+  }
+
+  // ---------- 分类管理（合并 / 删除；重命名暂未开放） ----------
+  async function loadCatManage() {
+    const ul = $('cat-list-manage');
+    if (!ul) return;
+    let rows;
+    try {
+      const { data, error } = await supabase.from('posts').select('category, category_slug');
+      if (error) { ul.innerHTML = '<li class="wb-empty">读取失败：' + error.message + '</li>'; return; }
+      const map = new Map();
+      (data || []).forEach((p) => {
+        const name = (p.category || '').trim();
+        if (!name) return;
+        const slug = (p.category_slug || '').trim() || slugify(name) || 'uncategorized';
+        if (!map.has(slug)) map.set(slug, { name, slug, count: 0 });
+        map.get(slug).count++;
+      });
+      rows = [...map.values()].sort((a, b) => b.count - a.count);
+    } catch (e) {
+      ul.innerHTML = '<li class="wb-empty">读取失败：' + (e?.message || e) + '</li>';
+      return;
+    }
+    $('cat-count').textContent = '共 ' + rows.length + ' 个';
+    if (!rows.length) { ul.innerHTML = '<li class="wb-empty">还没有分类</li>'; return; }
+    ul.innerHTML = '';
+    rows.forEach((c) => ul.appendChild(renderCatItem(c, rows)));
+  }
+
+  function renderCatItem(c, all) {
+    const li = document.createElement('li');
+    li.className = 'wb-cat-item';
+    const main = document.createElement('div');
+    main.className = 'wb-cat-row';
+    main.innerHTML =
+      '<span class="wb-cat-name">' + escapeHtml(c.name) + '</span>' +
+      '<span class="wb-cat-slug">/' + escapeHtml(c.slug) + '</span>' +
+      '<span class="wb-cat-count">' + c.count + ' 篇</span>';
+    li.appendChild(main);
+
+    const acts = document.createElement('div');
+    acts.className = 'wb-cat-acts';
+
+    const renameBtn = document.createElement('button');
+    renameBtn.type = 'button';
+    renameBtn.className = 'wb-cat-act';
+    renameBtn.textContent = '重命名';
+    renameBtn.onclick = () => startRename(li, c, all);
+
+    const sel = document.createElement('select');
+    sel.className = 'wb-cat-select';
+    all.forEach((o) => {
+      if (o.slug !== c.slug) {
+        const opt = document.createElement('option');
+        opt.value = o.slug; opt.textContent = o.name;
+        sel.appendChild(opt);
+      }
+    });
+    const mergeBtn = document.createElement('button');
+    mergeBtn.type = 'button';
+    mergeBtn.className = 'wb-cat-act';
+    mergeBtn.textContent = '合并到…';
+    mergeBtn.onclick = async () => {
+      const target = all.find((o) => o.slug === sel.value);
+      if (!target) return;
+      if (!confirm('把「' + c.name + '」下的 ' + c.count + ' 篇文章合并到「' + target.name + '」？')) return;
+      mergeBtn.textContent = '合并中…'; mergeBtn.disabled = true;
+      const ok = await mergeCategory(c, target);
+      if (ok) { await loadCatManage(); }
+      else { mergeBtn.textContent = '合并到…'; mergeBtn.disabled = false; }
+    };
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'wb-cat-act wb-cat-del';
+    del.textContent = '删除';
+    del.onclick = async () => {
+      if (!confirm('删除分类「' + c.name + '」？其下 ' + c.count + ' 篇文章将归入「未分类」。')) return;
+      del.textContent = '删除中…'; del.disabled = true;
+      const ok = await deleteCategory(c);
+      if (ok) { await loadCatManage(); }
+      else { del.textContent = '删除'; del.disabled = false; }
+    };
+
+    acts.append(renameBtn, sel, mergeBtn, del);
+    li.appendChild(acts);
+    return li;
+  }
+
+  // 进入「重命名」内联编辑态
+  function startRename(li, c, all) {
+    li.innerHTML = '';
+    li.className = 'wb-cat-item wb-cat-item--edit';
+
+    const nameInput = document.createElement('input');
+    nameInput.className = 'wb-cat-input';
+    nameInput.value = c.name;
+    nameInput.placeholder = '分类显示名';
+
+    const slugInput = document.createElement('input');
+    slugInput.className = 'wb-cat-input';
+    slugInput.value = c.slug;
+    slugInput.placeholder = 'url-slug';
+
+    const preview = document.createElement('span');
+    preview.className = 'wb-cat-slug-preview';
+    const renderPreview = () => {
+      const s = (slugInput.value.trim() || slugify(nameInput.value) || 'uncategorized');
+      preview.textContent = '/' + s;
+    };
+    nameInput.addEventListener('input', renderPreview);
+    slugInput.addEventListener('input', renderPreview);
+    renderPreview();
+
+    const msg = document.createElement('span');
+    msg.className = 'wb-cat-rename-msg';
+
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.className = 'wb-cat-act';
+    save.textContent = '保存';
+    save.onclick = async () => {
+      const newName = nameInput.value.trim();
+      if (!newName) { msg.textContent = '名称不能为空'; return; }
+      let newSlug = slugInput.value.trim();
+      if (!newSlug) newSlug = slugify(newName);
+      if (!/^[a-z0-9-]+$/.test(newSlug)) { msg.textContent = 'Slug 只能是小写字母、数字和连字符'; return; }
+      if (newSlug !== c.slug && all.some((o) => o.slug === newSlug)) { msg.textContent = '该 Slug 已存在'; return; }
+      save.textContent = '保存中…'; save.disabled = true;
+      const ok = await renameCategory(c, newName, newSlug);
+      if (ok) await loadCatManage();
+      else { save.textContent = '保存'; save.disabled = false; }
+    };
+
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'wb-cat-act wb-cat-cancel';
+    cancel.textContent = '取消';
+    cancel.onclick = () => loadCatManage();
+
+    const row1 = document.createElement('div');
+    row1.className = 'wb-cat-rename-row';
+    row1.append(nameInput, slugInput, preview);
+    const row2 = document.createElement('div');
+    row2.className = 'wb-cat-rename-row';
+    row2.append(save, cancel, msg);
+    li.append(row1, row2);
+    nameInput.focus();
+  }
+
+  async function renameCategory(src, newName, newSlug) {
+    // 1) 改写该分类下所有文章的显示名与 slug
+    const { error } = await supabase
+      .from('posts').update({ category: newName, category_slug: newSlug })
+      .eq('category_slug', src.slug);
+    if (error) { alert('重命名失败：' + error.message); return false; }
+    try {
+      // 2) 级联：原本指向旧 slug 的别名，改指向新 slug（处理 A→B→C 链路）
+      await supabase.from('category_aliases').update({ new_slug: newSlug }).eq('new_slug', src.slug);
+      // 3) 写入旧 slug → 新 slug 映射（若旧 slug 已有别名则覆盖）
+      await supabase.from('category_aliases').upsert(
+        { old_slug: src.slug, new_slug: newSlug },
+        { onConflict: 'old_slug' }
+      );
+    } catch (e) {
+      // 别名写入失败不应回滚文章改名，仅提示（重定向会缺失，但内容已就位）
+      console.warn('[cat] 写入 slug 别名失败', e);
+    }
+    return true;
+  }
+
+  async function mergeCategory(src, dst) {
+    const { error } = await supabase
+      .from('posts').update({ category: dst.name, category_slug: dst.slug })
+      .eq('category_slug', src.slug);
+    if (error) { alert('合并失败：' + error.message); return false; }
+    return true;
+  }
+
+  async function deleteCategory(src) {
+    const { error } = await supabase
+      .from('posts').update({ category: '', category_slug: 'uncategorized' })
+      .eq('category_slug', src.slug);
+    if (error) { alert('删除失败：' + error.message); return false; }
+    return true;
   }
 
   // ---------- 一键翻译（经 /api/translate 服务端中转调 LLM） ----------
@@ -817,6 +1042,11 @@ export const prerender = true;
       showLogin();
     });
 
+    // 模块导航：写作管理 / 评论管理 / 其他功能
+    $('wb-modnav').querySelectorAll('button').forEach((b) => {
+      b.onclick = () => switchModule(b.dataset.mod);
+    });
+
     // 操作按钮
     $('save-draft-btn').onclick = saveDraft;
     $('publish-btn').onclick = publish;
@@ -933,5 +1163,12 @@ export const prerender = true;
     supabase.auth.getSession()
       .then(({ data }) => { if (data.session) showWorkbench(); else showLogin(); })
       .catch(() => showLogin());
+
+    // D2：会话状态监听——主动退出 / 令牌过期 / 异地登出 任一发生都自动回到登录界面
+    try {
+      supabase.auth.onAuthStateChange((_event, session) => {
+        if (!session) showLogin();
+      });
+    } catch (e) { console.warn('[admin] 会话监听注册失败（不影响手动退出）', e); }
   }
 </script>

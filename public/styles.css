@@ -605,6 +605,16 @@ a { color: inherit; }
   font-size: 16px; color: var(--muted); line-height: 1.85; margin: 0 0 22px;
   padding-left: 13px; border-left: 3px solid var(--accent);
 }
+/* 无译文提示横幅：当前语言缺已发布译文时，说明现状并给出去其他已存译文版本的链接 */
+.translation-notice {
+  margin: 0 0 22px; padding: 12px 16px;
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: var(--radius); background: var(--surface-2);
+}
+.translation-notice-text { margin: 0; font-size: 14.5px; font-weight: 600; color: var(--text-strong); }
+.translation-notice-note { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+.translation-notice-link { display: inline-block; margin-top: 8px; font-size: 13px; color: var(--accent); }
+.translation-notice-link:hover { text-decoration: underline; }
 /* 正文排版（对齐 GitHub markdown-body 文档风） */
 .content { font-size: 16px; line-height: 1.7; color: var(--text); }
 .content > p { margin: 0 0 16px; }
@@ -780,6 +790,8 @@ a { color: inherit; }
 .comments-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .comments-msg { font-size: 13px; color: var(--muted); min-height: 18px; flex: 1; }
 .comments-msg-err { color: #cf222e; }
+.comments-msg-warn { color: #9a6700; }
+[data-theme="dark"] .comments-msg-warn { color: #d29922; }
 .comments-submit {
   font: inherit; font-weight: 600; color: #fff; cursor: pointer;
   background: var(--accent); border: 1px solid var(--accent);
@@ -835,6 +847,12 @@ a { color: inherit; }
 }
 .comment-del:hover { color: #cf222e; border-color: #ffc9c9; }
 [data-theme="dark"] .comment-del:hover { color: #f85149; border-color: #652b2b; }
+/* 公开列表中的内联删除（本人已通过评论）：更小巧，靠右显示 */
+.comment-del--inline {
+  margin-top: 0; margin-left: auto; align-self: center;
+  font-size: 11px; padding: 1px 8px; opacity: .8;
+}
+.comment-del--inline:hover { opacity: 1; }
 
 
 /* ================= 分享区 ================= */
@@ -905,3 +923,90 @@ a { color: inherit; }
 }
 [data-theme="dark"] .comments-retry { background: #f85149; }
 .comments-retry:hover { opacity: .88; }
+
+/* ============================================================
+   写作后台（AdminLayout 独立外壳 + 三模块）
+   ============================================================ */
+.admin-body { background: var(--bg-soft); color: var(--text); min-height: 100vh; }
+.admin-main { max-width: var(--wrap); margin: 0 auto; padding: 24px 20px 64px; }
+
+/* 后台按钮紧凑化（仅作用域 .wb，不影响前台全站 .btn） */
+.wb .btn {
+  padding: 7px 16px; border-radius: 8px; font-size: 13.5px; font-weight: 600;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.wb .btn:hover { transform: none; box-shadow: none; }
+.wb .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--border); }
+.wb .btn-ghost:hover { background: var(--accent-soft); border-color: var(--accent); }
+.wb .btn-danger {
+  padding: 7px 16px; border-radius: 8px; font-size: 13.5px; font-weight: 600;
+}
+
+/* 顶部极简条 */
+.wb-top-right { gap: 10px; align-items: center; }
+.wb-mini-btn {
+  font: inherit; font-size: 13px; cursor: pointer;
+  padding: 6px 14px; border-radius: 8px;
+  background: transparent; color: var(--muted); border: 1px solid var(--border);
+}
+.wb-mini-btn:hover { color: var(--text); border-color: var(--text); }
+.wb-mini-link {
+  font-size: 13px; color: var(--accent); text-decoration: none;
+  padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border);
+}
+.wb-mini-link:hover { background: var(--accent-soft); border-color: var(--accent); }
+
+/* 模块导航（纤细标签） */
+.wb-modnav { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+.wb-modnav button {
+  font: inherit; font-size: 14px; cursor: pointer; background: none; border: none; color: var(--muted);
+  padding: 9px 16px; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color .15s, border-color .15s;
+}
+.wb-modnav button:hover { color: var(--text); }
+.wb-modnav button.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+/* 模块容器淡入 */
+.wb-module { animation: wb-fade .15s ease; }
+@keyframes wb-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* 其他功能：倒计时 + 分类 两栏 */
+.wb-grid-misc { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+@media (max-width: 720px) { .wb-grid-misc { grid-template-columns: 1fr; } }
+
+/* 分类管理 */
+.wb-cat-note { margin: 0 0 12px; }
+.wb-cat-item { padding: 12px 4px; border-bottom: 1px solid var(--border); }
+.wb-cat-item:last-child { border-bottom: none; }
+.wb-cat-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.wb-cat-name { font-size: 14px; font-weight: 600; color: var(--text-strong); }
+.wb-cat-slug { font-size: 12px; color: var(--muted); }
+.wb-cat-count { font-size: 12px; color: var(--muted); margin-left: auto; }
+.wb-cat-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wb-cat-select {
+  font: inherit; font-size: 13px; padding: 5px 8px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text);
+}
+.wb-cat-act {
+  font: inherit; font-size: 12.5px; cursor: pointer; padding: 5px 12px; border-radius: 8px;
+  background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+}
+.wb-cat-act:hover { border-color: var(--accent); color: var(--accent); }
+.wb-cat-del:hover { border-color: #cf222e; color: #cf222e; background: #fff1f0; }
+[data-theme="dark"] .wb-cat-del:hover { background: #2d1214; }
+
+/* 分类重命名内联编辑态 */
+.wb-cat-item--edit { background: var(--surface-2); border-radius: 10px; padding: 12px; }
+.wb-cat-rename-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.wb-cat-rename-row:last-child { margin-bottom: 0; }
+.wb-cat-input {
+  font: inherit; font-size: 13px; padding: 6px 9px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text);
+}
+.wb-cat-input:first-child { min-width: 140px; }
+.wb-cat-input:last-of-type { min-width: 120px; }
+.wb-cat-slug-preview { font-size: 12px; color: var(--muted); }
+.wb-cat-rename-msg { font-size: 12px; color: #cf222e; }
+[data-theme="dark"] .wb-cat-rename-msg { color: #f85149; }
+.wb-cat-cancel { background: transparent; color: var(--muted); }
+.wb-cat-cancel:hover { color: var(--text); border-color: var(--text); }

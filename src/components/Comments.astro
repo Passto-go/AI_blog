@@ -25,6 +25,7 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     data-status-rejected-note={t('post.commentStatusRejectedNote')}
     data-del={t('post.commentDelete')}
     data-del-confirm={t('post.commentDeleteConfirm')}
+    data-token-missing={t('post.commentTokenMissing')}
     data-deleted={t('post.commentDeleted')}>
     <h2 class="comments-title">
       <Icon name="comment" size={18} />
@@ -115,43 +116,6 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     } catch (e) { return iso; }
   }
 
-  // 渲染一条「公开」评论（已通过）。isReply=true 表示为管理员回复，缩进展示
-  function renderPublicItem(list, c, lang, isReply) {
-    const li = document.createElement('li');
-    li.className = 'comment-item' + (isReply ? ' comment-reply' : '');
-    li.dataset.id = c.id;
-
-    const head = document.createElement('div');
-    head.className = 'comment-head';
-
-    const name = document.createElement('span');
-    name.className = 'comment-author';
-    name.textContent = c.author || '匿名';
-    head.appendChild(name);
-
-    // 管理员身份徽标
-    if (c.is_admin) {
-      const badge = document.createElement('span');
-      badge.className = 'comment-badge comment-badge--admin';
-      badge.textContent = lang === 'en' ? 'Admin' : lang === 'ja' ? '管理者' : '管理员';
-      head.appendChild(badge);
-    }
-
-    const time = document.createElement('span');
-    time.className = 'comment-time';
-    time.textContent = fmtDate(c.created_at, lang);
-    head.appendChild(time);
-
-    const body = document.createElement('p');
-    body.className = 'comment-body';
-    body.textContent = c.content || '';
-
-    li.appendChild(head);
-    li.appendChild(body);
-    list.appendChild(li);
-    return li;
-  }
-
   async function main() {
     const root = document.getElementById('comments');
     if (!root) return;
@@ -174,6 +138,7 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     const tDel = root.dataset.del || '删除';
     const tDelConfirm = root.dataset.delConfirm || '确定删除？';
     const tDeleted = root.dataset.deleted || '已删除';
+    const tTokenMissing = root.dataset.tokenMissing || '';
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     const form = document.getElementById('comments-form');
@@ -193,8 +158,59 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     const myHintEl = document.getElementById('my-comments-hint');
     const myListEl = document.getElementById('my-comments-list');
 
-    // 本人评论 id 集合（用于公开列表去重，避免与「我的评论」面板重复）
+    // 本人评论 id 集合：公开列表中命中者追加内联删除按钮（身份=本地令牌匹配过）
     let myIds = new Set();
+
+    // 渲染一条「公开」评论（已通过）。isReply=true 表示为管理员回复，缩进展示。
+    // 已通过的本人评论「毕业」进入公开列表，但仍可在此自助删除：
+    // 前端仅凭 myIds 决定「是否显示按钮」，真正的权限校验在服务端
+    // delete_own_comment(p_id, p_token)——id 与令牌双条件匹配，非本人删不动。
+    function renderPublicItem(list, c, isReply) {
+      const li = document.createElement('li');
+      li.className = 'comment-item' + (isReply ? ' comment-reply' : '');
+      li.dataset.id = c.id;
+
+      const head = document.createElement('div');
+      head.className = 'comment-head';
+
+      const name = document.createElement('span');
+      name.className = 'comment-author';
+      name.textContent = c.author || '匿名';
+      head.appendChild(name);
+
+      // 管理员身份徽标
+      if (c.is_admin) {
+        const badge = document.createElement('span');
+        badge.className = 'comment-badge comment-badge--admin';
+        badge.textContent = lang === 'en' ? 'Admin' : lang === 'ja' ? '管理者' : '管理员';
+        head.appendChild(badge);
+      }
+
+      const time = document.createElement('span');
+      time.className = 'comment-time';
+      time.textContent = fmtDate(c.created_at, lang);
+      head.appendChild(time);
+
+      // 本人评论：内联删除入口（他人看不到这个按钮）
+      if (myIds.has(c.id)) {
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'comment-del comment-del--inline';
+        del.textContent = tDel;
+        del.setAttribute('aria-label', tDel);
+        del.addEventListener('click', () => deleteMine(c.id));
+        head.appendChild(del);
+      }
+
+      const body = document.createElement('p');
+      body.className = 'comment-body';
+      body.textContent = c.content || '';
+
+      li.appendChild(head);
+      li.appendChild(body);
+      list.appendChild(li);
+      return li;
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { persistSession: false },
@@ -290,14 +306,17 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
       const seen = new Set();
       const unique = all.filter((c) => c.id && !seen.has(c.id) ? (seen.add(c.id), true) : false);
       myIds = new Set(unique.map((c) => c.id));
-      renderMine(unique);
-      toggleMy(unique.length > 0);
+      toggleMy(renderMine(unique) > 0);
       return unique;
     }
 
     function renderMine(list) {
+      // 已通过的评论「毕业」进入公开列表（那里带内联删除按钮），
+      // 本面板只保留待审核 / 未通过的评论，避免同一条评论两处出现。
+      const visible = list.filter((c) => !c.approved);
       myListEl.innerHTML = '';
-      list.forEach((c) => myListEl.appendChild(renderMyItem(c)));
+      visible.forEach((c) => myListEl.appendChild(renderMyItem(c)));
+      return visible.length;
     }
 
     function toggleMy(show) {
@@ -345,7 +364,9 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
         }
         hideListError();
         listEl.innerHTML = '';
-        const rows = (data || []).filter((c) => !myIds.has(c.id));
+        // 本人评论不再从此过滤——已通过的评论属于公开内容，本人凭 myIds
+        // 在行内看到删除按钮；「我的评论」面板只保留未通过/待审的。
+        const rows = data || [];
 
         // 顶层评论（无 parent_id）；回复按 parent_id 归组
         const tops = rows.filter((c) => !c.parent_id);
@@ -364,17 +385,17 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
         let total = 0;
         tops.forEach((c) => {
           total++;
-          const li = renderPublicItem(listEl, c, lang, false);
+          const li = renderPublicItem(listEl, c, false);
           const reps = repliesByParent[c.id] || [];
           if (reps.length) {
             const ulRep = document.createElement('ul');
             ulRep.className = 'comment-replies';
-            reps.forEach((r) => { total++; renderPublicItem(ulRep, r, lang, true); });
+            reps.forEach((r) => { total++; renderPublicItem(ulRep, r, true); });
             li.appendChild(ulRep);
           }
         });
         // 孤儿回复：父评论不可见时，仍独立展示（带缩进，标明是回复）
-        orphans.forEach((c) => { total++; renderPublicItem(listEl, c, lang, true); });
+        orphans.forEach((c) => { total++; renderPublicItem(listEl, c, true); });
 
         countEl.textContent = String(total);
         emptyEl.hidden = total > 0;
@@ -458,10 +479,18 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
           return;
         }
         const row = data && data[0];
+        var tokenMissing = false;
         if (row && row.id) {
-          const store = loadStore();
-          store.push({ id: row.id, page, token: row.delete_token });
-          saveStore(store);
+          if (row.delete_token) {
+            const store = loadStore();
+            store.push({ id: row.id, page, token: row.delete_token });
+            saveStore(store);
+          } else {
+            // 防御：服务端未回传删除令牌（RPC 已保证生成，正常不应发生）。
+            // 评论仍会进入审核流程，但没有本地凭证日后无法自助删除，明确提示。
+            tokenMissing = true;
+            console.warn('[comments] add_comment 未返回 delete_token，评论将无法自助删除');
+          }
         }
       } catch (e) {
         console.warn('[comments] add_comment threw', e);
@@ -473,8 +502,8 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
         submitBtn.textContent = original;
       }
       textEl.value = '';
-      msgEl.textContent = tPending;
-      msgEl.className = 'comments-msg';
+      msgEl.textContent = tokenMissing ? tPending + ' ' + tTokenMissing : tPending;
+      msgEl.className = 'comments-msg' + (tokenMissing ? ' comments-msg-warn' : '');
       // 待审核：不进入公开列表，仅刷新「我的评论」面板展示状态
       await loadMine();
     });

@@ -10,7 +10,7 @@ import Countdown from '../Countdown.astro';
 import Comments from '../Comments.astro';
 import Share from '../Share.astro';
 
-const { lang, post } = Astro.props;
+const { lang, post, versions } = Astro.props;
 const t = useTranslations(lang);
 const { html, headings } = renderMarkdown(post.content || '');
 const dateStr = formatDate(post.published_at, lang);
@@ -37,6 +37,32 @@ for (const code of Object.keys(languages)) {
   const tr = await findTranslation(post.slug, code);
   langHrefs[code] = tr ? localizePath(`/posts/${tr.slug}/`, code) : localizePath('/', code);
 }
+
+// 无译文提示横幅：当前语言缺「已发布译文」时告知读者现状。
+// 判定条件与优先级（与 lib/posts.js 的 pickDisplayLang 级联保持一致）：
+//   · en 页：无英文译文 → 提示；有日文译文时附日文版链接（正文此时为中文兜底）
+//   · ja 页：无日文译文 → 提示；正文此时为英文兜底（有英文译文）或中文兜底
+//   · zh 页：不展示——中文即原文，且中文页不存在「缺中文译文」的业务场景
+// 适用边界：versions.available 只认 published=true 的版本，草稿译文对读者视为不存在。
+const missingNotice = (() => {
+  if (!versions || lang === 'zh') return null;
+  if (lang === 'en') {
+    if (versions.available.en) return null;
+    return {
+      text: versions.available.ja ? t('article.missingEn') : t('article.missingEnJa'),
+      note: t('article.showingZh'),
+      link: versions.siblings.ja
+        ? { href: localizePath(`/posts/${versions.siblings.ja}/`, 'ja'), label: t('article.readJa') }
+        : null,
+    };
+  }
+  if (versions.available.ja) return null;
+  return {
+    text: versions.available.en ? t('article.missingJa') : t('article.missingJaEn'),
+    note: versions.displayLang === 'en' ? t('article.showingEn') : t('article.showingZh'),
+    link: null,
+  };
+})();
 ---
 <Base lang={lang} title={post.title} description={post.excerpt || ''} langHrefs={langHrefs}>
   <div class="reading-bar" aria-hidden="true"><div class="reading-bar-fill" id="reading-fill"></div></div>
@@ -65,6 +91,15 @@ for (const code of Object.keys(languages)) {
     </aside>
 
     <article class="post-main">
+      {missingNotice && (
+        <aside class="translation-notice" role="note">
+          <p class="translation-notice-text">{missingNotice.text}</p>
+          {missingNotice.note && <p class="translation-notice-note">{missingNotice.note}</p>}
+          {missingNotice.link && (
+            <a class="translation-notice-link" href={missingNotice.link.href}>{missingNotice.link.label}</a>
+          )}
+        </aside>
+      )}
       {post.excerpt && <p class="post-lead">{post.excerpt}</p>}
       <div class="content" set:html={html} />
       <Share lang={lang} url={shareUrl} title={post.title} />

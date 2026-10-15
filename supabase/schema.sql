@@ -133,6 +133,8 @@ create policy "authenticated write settings"
 -- 新增状态字段（已存在则跳过）
 alter table comments add column if not exists rejected boolean not null default false;
 alter table comments add column if not exists delete_token text;
+-- 新评论自动生成删除令牌（列默认值；add_comment RPC 内也会显式生成，双保险）
+alter table comments alter column delete_token set default gen_random_uuid()::text;
 
 -- 为历史评论补一个随机删除令牌（仅用于「删除本人评论」；已通过的评论不受影响）
 update comments set delete_token = gen_random_uuid()::text where delete_token is null;
@@ -185,14 +187,15 @@ set search_path = public
 as $$
 begin
   return query
-    insert into comments (page, author, email, content, approved, rejected)
+    insert into comments (page, author, email, content, approved, rejected, delete_token)
     values (
       p_page,
       left(p_author, 40),
       left(coalesce(nullif(p_email, ''), ''), 120),
       left(p_content, 1000),
       false,
-      false
+      false,
+      gen_random_uuid()::text
     )
     returning comments.id, comments.delete_token;
 end;
@@ -268,4 +271,33 @@ create index if not exists comments_parent_idx on comments (parent_id);
 --   select column_name, data_type, column_default
 --     from information_schema.columns where table_name = 'comments' order by ordinal_position;
 -- ============================================================
+
+-- ============================================================
+-- 分类 slug 别名映射
+-- 重命名分类（改 slug）后，旧 slug 301 跳转到新 slug，避免旧链接 404。
+-- 与「categories 主表 + 外键」大方案不同：本表仅 2 字段、零业务耦合，可随时 DROP。
+-- ============================================================
+create table if not exists category_aliases (
+  old_slug   text primary key,
+  new_slug   text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table category_aliases enable row level security;
+
+-- 前台分类页 SSR 用 anon key 查重定向，公开可读（仅 slug 映射，无敏感信息）
+drop policy if exists "aliases public read" on category_aliases;
+create policy "aliases public read"
+  on category_aliases for select
+  using (true);
+
+-- 仅登录用户可写（后台重命名时写入 / 级联更新）
+drop policy if exists "aliases auth write" on category_aliases;
+create policy "aliases auth write"
+  on category_aliases for all
+  to authenticated
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
+
+create index if not exists category_aliases_new_idx on category_aliases (new_slug);
 
