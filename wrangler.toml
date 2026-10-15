@@ -1,11 +1,12 @@
-# Cloudflare Pages 配置（SSR 模式，Astro @astrojs/cloudflare 适配器生成 _worker.js）
-name = "mystyle"
-pages_build_output_dir = "./dist"
-
-# nodejs_compat 是硬性要求：缺它 Worker 运行时里任何 Node 内建调用直接 500
-# 注：disable_nodejs_process_v2 需要更新的 workerd 运行时，本地 wrangler 3.x 不支持，故不启
+name = "styleblog-v2-0"
+main = "dist/_worker.js/index.js"
+compatibility_date = "2025-07-18"
 compatibility_flags = ["nodejs_compat"]
 
-# 兼容日期取本地 wrangler 3.114 运行时支持的上限（2025-07-18）；
-# 生产环境运行时更新，接受不晚于该日期的设置
-compatibility_date = "2025-07-18"
+# Cloudflare Workers（Git 构建）配置。
+# Build command: npm run build  ->  输出到 ./dist
+# Deploy command: npx wrangler deploy  ->  由本文件驱动
+# 静态预渲染页（about/search/login/404）走 assets 直出，
+# 动态路由（首页/文章/分类）由 _worker.js 现查 Supabase 渲染。
+[assets]
+directory = "./dist"
