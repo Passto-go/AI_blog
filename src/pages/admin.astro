@@ -1233,15 +1233,8 @@ export const prerender = true;
     $('save-draft-btn').onclick = saveDraft;
     $('publish-btn').onclick = publish;
     $('new-article-btn').onclick = () => openEditor();
+    // 关闭弹窗只能点右上角 ✕：防止误触空白处/Esc 导致未保存内容被关掉
     $('editor-close').onclick = closeEditor;
-    // 点弹窗遮罩空白处关闭
-    document.querySelector('#mod-write .wb-main').addEventListener('click', (e) => {
-      if (e.target === e.currentTarget) closeEditor();
-    });
-    // Esc 关闭弹窗
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && $('mod-write').classList.contains('editing')) closeEditor();
-    });
     $('cd-save').onclick = saveCountdown;
 
     // 分类管理：新增分类
