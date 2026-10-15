@@ -70,21 +70,18 @@ npm run dev                 # 打开 http://localhost:4321
 ```bash
 npm run build     # 生成 dist/（含 _worker.js）
 ```
-站点为 **SSR 模式**：内容页每请求现查 Supabase，**发布文章无需重新构建**；只有改代码才需要构建部署。`dist/` 含 Cloudflare Pages Functions 运行时，部署到 Cloudflare Pages 即可。
+站点为 **SSR 模式**：内容页每请求现查 Supabase，**发布文章无需重新构建**；只有改代码才需要构建部署。`dist/` 含 Cloudflare Worker 运行时（`_worker.js`），部署到 **Cloudflare Workers（Git 构建 / Workers Builds）**。
 
-**方案 A（现在就用，¥0）：Cloudflare Pages 免费版（当前方案）**
-1. 仓库已推到 GitHub（`Passto-go/styleblog_V2.0`），在 Cloudflare 关联它：**Workers & Pages → Create → Pages → Connect to Git**；框架选 **Astro**，构建命令 `npm run build`，输出目录 `dist`。
-2. **Settings → Environment variables** 添加 `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY` / `PUBLIC_SITE_URL`（详见 `DEPLOY.md`）。
-3. 绑域名：**Custom domains → Set up a custom domain** → 填你的域名 → DNS 加 `CNAME` 指向 `<项目名>.pages.dev`（免费 HTTPS）。
-4. 以后发文：`/login` 发布 → 配了 Deploy Hook 就自动上线，否则回 Cloudflare 点一次部署。
+**方案 A（现在就用，¥0）：Cloudflare Workers 免费版（当前方案）**
+1. 仓库已推到 GitHub（`Passto-go/styleblog_V2.0`），在 Cloudflare 关联它：**Workers & Pages → Create → Connect to Git**（选 **Workers**，不是 Pages）；框架选 **Astro**，构建命令 `npm run build`，输出目录 `dist`，Deploy command 自动为 `npx wrangler deploy`。
+2. **Settings → Builds → Build environment variables** 添加 `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY` / `PUBLIC_SITE_URL` / `NODE_VERSION=22`（详见 `DEPLOY.md`）。
+3. 绑域名：**Settings → Triggers → Custom Domains → Add Custom Domain** → 填你的域名 → DNS 加 `CNAME` 指向 `<项目名>.workers.dev`（免费 HTTPS）。
+4. 以后发文：`/login` 发布 → **即时生效，无需任何部署操作**；只有改代码才需 push 触发重建。
 
-> Cloudflare Pages 免费版**带宽无限 + 500 次构建/月**，没有 Netlify「300 分钟 + 100 GB」的额度焦虑。
-> 国内访问预期：Cloudflare 在大陆同样「能用但偏慢」。等每月有 ¥15 左右，把 `dist/` 传到腾讯云 COS+CDN 即变快，代码一行不用改。
+> Cloudflare Workers 免费版**带宽无限 + 3,000 构建分钟/月 + 10 万请求/天**，没有 Netlify「300 分钟 + 100 GB」的额度焦虑。发文零构建，几乎用不完。
+> 国内访问预期：Cloudflare 在大陆同样「能用但偏慢」。等每月有 ¥15 左右，可迁移到国内 CDN，代码一行不用改。
 
-> ⚠️ 写作后台 `/login` 需要连通 Supabase；若你人在国内访问不畅，需在能联网的环境（代理）里登录写作。读者侧纯静态不受影响。
-
-**方案 B（备选）：直接上传 dist**
-Cloudflare → **Workers & Pages → Create → Pages → Upload assets**，拖入本地构建出的 `dist` 文件夹即可，同样不花构建额度。适合先看效果。
+> ⚠️ 写作后台 `/login` 需要连通 Supabase；若你人在国内访问不畅，需在能联网的环境（代理）里登录写作。读者侧走 Cloudflare 边缘现查，不受影响。
 
 ---
 
@@ -110,8 +107,8 @@ life-blog-v1/
 ├─ public/avatar.png       # 头像（放到 public/ 即自动启用）
 ├─ public/_headers         # 静态资源缓存头
 ├─ astro.config.mjs       # site 默认值；output:server + Cloudflare 适配器
-├─ wrangler.toml          # Cloudflare Pages 配置（nodejs_compat 等）
-├─ .nvmrc                 # Node 22（Cloudflare Pages 构建版本）
+├─ wrangler.toml          # Cloudflare Workers 配置（main + assets + nodejs_compat）
+├─ .nvmrc                 # Node 22（Cloudflare 构建版本）
 └─ .env.example           # 环境变量样例
 ```
 

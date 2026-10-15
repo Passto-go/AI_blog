@@ -1,56 +1,70 @@
-# 部署指南（Cloudflare Pages · SSR 动态模式）
+# 部署指南（Cloudflare Workers · Git 构建 · SSR 动态模式）
 
 > 站点为 Astro SSR：内容页（首页/文章/分类/归档/RSS/sitemap/搜索索引）每请求现查 Supabase，
 > **后台发布文章后即时生效，无需重新构建**。读者始终只访问 Cloudflare，不直连 Supabase。
 > 代码仓库：https://github.com/Passto-go/styleblog_V2.0 （分支 `main`）
+>
+> ⚠️ 本项目是 **Cloudflare Workers（通过 Git 构建，即 Workers Builds）**，不是经典 Pages。
+> Dashboard 的 Deploy command 为 `npx wrangler deploy`，由仓库根目录的 `wrangler.toml` 驱动。
 
-## 一、为什么选 Cloudflare Pages
+## 一、为什么选 Cloudflare Workers
 
-| | Netlify 免费版 | Cloudflare Pages 免费版 |
+| | Netlify 免费版 | Cloudflare Workers（免费） |
 |---|---|---|
 | 带宽 | 100 GB/月 | **无限** |
-| 构建额度 | 300 分钟/月 | **500 次/月** |
-| 免费子域名 | xxx.netlify.app | xxx.pages.dev |
+| 构建额度 | 300 分钟/月 | **3,000 构建分钟/月**（1 并发、20 分钟超时） |
+| 运行时请求 | 按量 | **10 万次/天**（单调用 CPU ≤ 10ms） |
+| 免费子域名 | xxx.netlify.app | xxx.workers.dev |
 | 自定义域名 | 免费 | 免费（SSL 自动） |
 
 本站为 SSR 模式：**内容更新走 Supabase（零构建）**，只有改代码才需要构建部署，
-500 次/月对个人博客绰绰有余；带宽无限，没有额度焦虑。
+3,000 分钟/月对个人博客绰绰有余（每次构建约 1–3 分钟，基本用不完）；带宽无限，无额度焦虑。
+
+> 构建分钟数（build minutes）与线上访问（Requests/CPU）是**两套独立额度**，互不影响。
+> 详见文末「免费额度说明」。
 
 ## 二、部署：Git 自动部署（唯一推荐路径）
 
-> ⚠️ Cloudflare 的「直接上传（Direct Upload）」项目**创建后无法转为 Git 集成**。
-> 本仓库为 SSR（依赖构建生成的 `_worker.js`），请务必用 Git 方式创建项目。
+> ⚠️ 必须用 **Git** 方式创建项目（Connect to Git），不要选「直接上传」。
+> 本仓库为 SSR（依赖构建生成的 `_worker.js`），且 `npx wrangler deploy` 需要 Git 构建环境。
 
-1. Cloudflare Dashboard → **Workers & Pages → Overview → Create application → Pages → Connect to Git**
+1. Cloudflare Dashboard → **Workers & Pages → Overview → Create → Connect to Git**
+   - 注意：选 **Workers**（不是 Pages 标签）。Workers 现在原生支持静态资源 + Git 构建。
 2. 授权 GitHub，选择仓库 `Passto-go/styleblog_V2.0`，Production branch 选 `main`
 3. 构建设置（Framework preset 选 **Astro** 后通常自动填好）：
    - Framework preset：**Astro**
    - Build command：**npm run build**
    - Build output directory：**dist**
-   （适配器会在 `dist` 里生成 `_worker.js`，Pages 自动识别并以 Functions 运行）
-4. **Environment variables**（Production 环境）添加：
+   - Deploy command（自动填）：**npx wrangler deploy**  ← 由 `wrangler.toml` 驱动，不要改
+4. **构建环境变量**在 **Settings → Builds → Build environment variables**（不是 Runtime variables 区）添加：
 
    | 变量 | 值 | 必填 |
    |---|---|---|
    | `PUBLIC_SUPABASE_URL` | `https://wgqdqbstibhojmrfhtmg.supabase.co` | 是 |
    | `PUBLIC_SUPABASE_ANON_KEY` | `eyJ...` 那串 anon public key | 是 |
-   | `PUBLIC_SITE_URL` | `https://<项目名>.pages.dev` | 建议 |
+   | `PUBLIC_SITE_URL` | `https://<项目名>.workers.dev` | 建议 |
    | `NODE_VERSION` | `22` | 建议（仓库已有 `.nvmrc`，双保险） |
 
-5. **Save and Deploy**，约 1–2 分钟得到 `https://mystyle.pages.dev`
+5. **Save and Deploy**，约 1–3 分钟得到 `https://<项目名>.workers.dev`
 6. 以后**只有改代码才需要 push**；发文不触发任何构建
 
-### 兼容性标志（`wrangler.toml` 已带，无需手动配）
+> 改完环境变量 / `wrangler.toml` 后，必须 **Retry deployment**（或重新 push）才生效。
+> 缺 `PUBLIC_*` 变量也能构建成功（代码有示例数据降级），但那样线上只会显示示例文章、后台读不到你的 Supabase。
 
-SSR 依赖 Node 兼容层，仓库根目录的 `wrangler.toml` 已写好：
+### `wrangler.toml` 已带，无需手动配
 
 ```toml
-compatibility_flags = ["nodejs_compat"]
+name = "styleblog-v2-0"          # 必须与 Dashboard 项目名完全一致
+main = "dist/_worker.js/index.js"
 compatibility_date = "2025-07-18"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./dist"
 ```
 
-缺 `nodejs_compat` 时 Worker 里任何 Node 内建调用会直接 500。
-**不要**加 `disable_nodejs_process_v2`：本地 wrangler 3.x 运行时不识别该标志会启动失败。
+- `nodejs_compat`：SSR 依赖 Node 兼容层，缺它 Worker 里任何 Node 内建调用会直接 500。
+- **不要**加 `disable_nodejs_process_v2`：本地 wrangler 3.x 运行时不识别该标志会启动失败。
 
 ## 三、发布文章的完整流程（SSR 版）
 
@@ -63,25 +77,17 @@ compatibility_date = "2025-07-18"
 - 评论原本就是 realtime 动态，不受影响
 - 下架文章同样即时（`published=false` 后下一请求即消失）
 
-## 四、应急：直接上传（仅作备用，别当主路径）
+## 四、自定义域名（eu.org 批下来后）
 
-1. 本地构建：`bash /workspace/build-and-package.sh`（或手动 `npm run build`）
-2. Cloudflare → **Workers & Pages → Create → Pages → Upload assets** → 拖入解压出的 `dist`
-3. `_worker.js` 随目录一起上传，SSR 可工作（拖拽支持 `_worker.js`，不支持 functions 目录编译，本仓库不涉及）
-
-> ⚠️ 该方式创建的项目**以后无法转成 Git 集成**，且每次代码更新都要重新构建再拖。
-> 只在 Cloudflare 账号刚注册、Git 授权还没就绪时应急用，用完尽快迁到 Git 路径（新建 Git 项目即可）。
-
-## 五、自定义域名（eu.org 批下来后）
-
-1. Pages 项目 → **Custom domains → Set up a custom domain** → 填 `mystyle.eu.org`
-2. DNS 在 Cloudflare 则自动配置；在别处则加 `CNAME` 指向 `<项目名>.pages.dev`
+1. Workers 项目 → **Settings → Triggers → Custom Domains → Add Custom Domain** → 填 `mystyle.eu.org`
+2. DNS 在 Cloudflare 则自动配置；在别处则加 `CNAME` 指向 `<项目名>.workers.dev`
 3. SSL 自动签发
-4. 把 `PUBLIC_SITE_URL` 改成 `https://mystyle.eu.org`，**重新部署一次**（RSS/sitemap/canonical 随之更新；文章内容不受影响）
+4. 把 **Build environment variables** 里的 `PUBLIC_SITE_URL` 改成 `https://mystyle.eu.org`，**重新部署一次**
+   （RSS/sitemap/canonical 随之更新；文章内容不受影响）
 
-## 六、上线后验证清单
+## 五、上线后验证清单
 
-- [ ] 首页 200，文章列表 = Supabase 已发布文章
+- [ ] 首页 200，文章列表 = Supabase 已发布文章（不是示例数据）
 - [ ] 后台发布一篇测试文章 → **不做任何部署操作**，刷新首页应立刻出现
 - [ ] `/posts/<slug>/` 200；乱写的 slug 返回 404（带 404 页面内容）
 - [ ] `/en/`、`/ja/` 正常，语言切换不 404
@@ -90,14 +96,33 @@ compatibility_date = "2025-07-18"
 - [ ] 文章页评论能加载、能发
 - [ ] 深色模式、手机宽度正常；设计与此前静态版一致
 
+## 六、免费额度说明（哪些操作消耗、哪些不消耗）
+
+**消耗「构建分钟（build minutes，免费 3,000/月）」的操作：**
+- 每次 push 到 `main` 触发的自动构建（约 1–3 分钟/次）
+- 每次 **Retry deployment** / 手动重新部署
+- 每次改了环境变量 / `wrangler.toml` 后的重新构建
+- ✅ 量级极小：3,000 分钟 = 50 小时，个人博客基本用不完
+
+**不消耗构建分钟的操作：**
+- 读者访问页面 → 走「Requests（免费 10 万/天）+ CPU（免费 10ms/调用）」额度，与构建无关
+- 后台发布 / 编辑 / 下架文章 → 零构建、零分钟（SSR 现查 Supabase）
+- 改环境变量本身（不触发构建就不消耗；但要让其生效需手动重建一次）
+- 本地 `wrangler dev` / 本地调试
+
+**其他运行时额度（本博客量级基本碰不到上限）：**
+- Requests 10 万/天、单调用 CPU 10ms（SSR 渲染通常 <10ms）
+- Observability / Logs 20 万条/天
+
 ## 七、常见问题与应对
 
 | 现象 | 原因 | 处理 |
 |---|---|---|
+| 构建失败，日志提到 `Workers-specific command in a Pages project` | `wrangler.toml` 是 Pages 格式但 Deploy command 是 `npx wrangler deploy` | 用本文的 Workers 格式 `wrangler.toml`（已修复） |
 | 全站 500，日志提到 Node 内建模块 | 缺 nodejs_compat | `wrangler.toml` 已带；确认仓库根目录有该文件 |
-| 本地 `wrangler pages dev` 起不来，报 No such compatibility flag | 加了新版才有的标志（如 disable_nodejs_process_v2） | 删掉它，只留 nodejs_compat |
+| 线上只显示示例文章、后台读不到数据 | 没加 `PUBLIC_*` 构建变量 | 在 Settings → Builds → Build environment variables 补齐后 Retry deployment |
 | 文章发布了但页面没有 | 几乎不可能（无构建环节）；先确认 `published=true` | 访问 `/search-index.json` 看文章在不在 |
 | 页面 404 但文章确实存在 | slug 输错 / 语言不匹配（`/en/posts/` 只列 en 文章） | 从列表页点进去，别手拼 URL |
 | Supabase 临时故障 | 拉取失败会回退示例文章（保留的降级逻辑） | 站点不崩，恢复后自动正常 |
 | Worker CPU 超限（免费 10ms/调用） | 超长文 marked 渲染耗时 | 当前文章量级远未触顶；真触顶再加边缘缓存 |
-| 想给动态页加缓存 | 默认无缓存，发布零延迟 | 需要时在响应加 `s-maxage=60` 让边缘缓存 60 秒；个人博客当前没必要 |
+| 想给动态页加缓存 | 默认无缓存，发布零延迟 | 需要时在响应加 `s-maxage=60`；个人博客当前没必要 |
