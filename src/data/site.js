@@ -78,9 +78,9 @@ export const site = {
     ],
   },
 
-  // 倒计时：把 target 改成你的目标日（ISO 本地时间），label 写事件名
-  // 例：高考 target:'2027-06-07T09:00:00' label:'高考'
-  countdown: { target: '2027-01-01T00:00:00', label: '元旦' },
+  // 倒计时默认值（后台未设置时回退）：target 为目标日 ISO 本地时间，name 为事件名
+  // 例：高考 target:'2027-06-07T09:00:00' name:'高考'
+  countdown: { target: '2027-01-01T00:00:00', name: '元旦' },
 
   // 写作后台（顶栏「登录」入口指向这里）
   loginPath: '/login',

@@ -1,17 +1,39 @@
 ---
 import Icon from './Icon.astro';
 import { site } from '../data/site.js';
+import { getSetting } from '../lib/posts.js';
 import { useTranslations } from '../i18n/ui.js';
 
 const { lang = 'zh' } = Astro.props;
 const t = useTranslations(lang);
-const cd = site.countdown;
+
+// 优先用后台设置的倒计时；表未建 / 未设置时回退到 site.js 默认值
+const setting = await getSetting('countdown');
+const cfg = setting && setting.target ? setting : site.countdown;
+const name = cfg.name || cfg.label || '';
+const target = cfg.target;
+
 const labels = lang === 'en' ? ['Days', 'Hrs', 'Min', 'Sec'] : lang === 'ja' ? ['日', '時', '分', '秒'] : ['天', '时', '分', '秒'];
 const units = ['d', 'h', 'm', 's'];
+
+function fmtDate(iso, l) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  if (l === 'en') {
+    const mo = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1];
+    return `${mo} ${day}, ${y}`;
+  }
+  return `${y}年${m}月${day}日`;
+}
+const dateStr = fmtDate(target, lang);
+const fullLabel = name ? `${name}（${dateStr}）` : dateStr;
 ---
 <section class="widget">
   <h4 class="widget-title"><Icon name="clock" size={15} /> {t('widget.countdown')}</h4>
-  <p class="countdown-label">{t('widget.countdownTo', { label: cd.label })}</p>
+  <p class="countdown-label">{t('widget.countdownTo', { label: fullLabel })}</p>
   <div class="countdown-grid" id="countdown">
     {units.map((u, i) => (
       <div class="cd-cell">
@@ -22,7 +44,7 @@ const units = ['d', 'h', 'm', 's'];
   </div>
 </section>
 
-<script define:vars={{ target: cd.target }}>
+<script define:vars={{ target }}>
   (function () {
     var el = document.getElementById('countdown');
     if (!el) return;

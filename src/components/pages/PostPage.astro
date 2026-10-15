@@ -1,6 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { getPost, getPosts, getCategories, renderMarkdown, findTranslation } from '../../lib/posts.js';
+import { getAllPosts, getCategories, renderMarkdown, findTranslation } from '../../lib/posts.js';
 import { useTranslations, localizePath, languages } from '../../i18n/ui.js';
 import { formatDate } from '../../lib/format.js';
 import ProfileCard from '../ProfileCard.astro';
@@ -16,7 +16,7 @@ const { html, headings } = renderMarkdown(post.content || '');
 const dateStr = formatDate(post.published_at, lang);
 const catHref = post.categorySlug ? localizePath(`/categories/${post.categorySlug}/`, lang) : null;
 
-const allPosts = await getPosts(lang);
+const allPosts = await getAllPosts();
 const cats = await getCategories(lang);
 const wordCount = (post.content || '').replace(/\s+/g, '').length;
 const idx = allPosts.findIndex((p) => p.slug === post.slug);
@@ -55,6 +55,13 @@ for (const code of Object.keys(languages)) {
   </div>
 
   <div class="post-layout">
+    <aside class="post-aside post-aside-left">
+      <Toc headings={headings} lang={lang} />
+      <ProfileCard lang={lang} postsCount={allPosts.length} catsCount={cats.length} />
+      <TodayQuote lang={lang} />
+      <Countdown lang={lang} />
+    </aside>
+
     <article class="post-main">
       {post.excerpt && <p class="post-lead">{post.excerpt}</p>}
       <div class="content" set:html={html} />
@@ -62,13 +69,6 @@ for (const code of Object.keys(languages)) {
       <Comments lang={lang} page={pagePath} />
       <p class="back"><a href={localizePath('/', lang)}>{t('post.back')}</a></p>
     </article>
-
-    <aside class="post-aside post-aside-right">
-      <Toc headings={headings} lang={lang} />
-      <ProfileCard lang={lang} postsCount={allPosts.length} catsCount={cats.length} />
-      <TodayQuote lang={lang} />
-      <Countdown lang={lang} />
-    </aside>
   </div>
 
   {(prevPost || nextPost) && (

@@ -97,9 +97,32 @@ exception
 end $$;
 
 -- ============================================================
--- 自查（可选）：执行后应返回 2 行（select + insert 两条策略）
---   select policyname from pg_policies where tablename = 'comments';
--- 确认表已启用实时：
---   select * from pg_publication_tables where pubname = 'supabase_realtime';
+-- 站点动态配置表（倒计时等由写作后台写入，读者端 SSR 读取）
+-- key 为主键；value 为 jsonb，如倒计时 {"name":"元旦","target":"2027-01-01T00:00:00"}
+-- ============================================================
+create table if not exists site_settings (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table site_settings enable row level security;
+
+-- 读者端：任何人可读（SSR 取倒计时用 anon key）
+drop policy if exists "public read settings" on site_settings;
+create policy "public read settings"
+  on site_settings for select
+  using (true);
+
+-- 写作者端：已登录用户可读写
+drop policy if exists "authenticated write settings" on site_settings;
+create policy "authenticated write settings"
+  on site_settings for all
+  to authenticated
+  using (true) with check (true);
+
+-- ============================================================
+-- 自查（可选）：站点配置表策略
+--   select policyname from pg_policies where tablename = 'site_settings';
 -- ============================================================
 

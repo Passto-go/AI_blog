@@ -115,6 +115,14 @@ export const prerender = true;
             </div>
             <ul id="post-list" class="wb-list"></ul>
           </div>
+
+          <div class="wb-card" id="cd-card">
+            <div class="wb-side-head"><strong>首页倒计时</strong></div>
+            <label class="wb-field">名称<input id="cd-name" placeholder="如：元旦" /></label>
+            <label class="wb-field">日期<input id="cd-date" type="date" /></label>
+            <button id="cd-save" class="btn" type="button">保存倒计时</button>
+            <span id="cd-msg" class="wb-hint"></span>
+          </div>
         </aside>
       </div>
     </section>
@@ -162,6 +170,34 @@ export const prerender = true;
     const { data } = await supabase.auth.getUser();
     $('wb-user').textContent = data?.user?.email || '';
     await loadList();
+    loadCountdown();
+  }
+
+  // ---------- 首页倒计时（存于 site_settings） ----------
+  async function loadCountdown() {
+    try {
+      const { data, error } = await supabase
+        .from('site_settings').select('value').eq('key', 'countdown').maybeSingle();
+      if (!error && data?.value) {
+        $('cd-name').value = data.value.name || data.value.label || '';
+        const t = (data.value.target || '').slice(0, 10);
+        if (t) $('cd-date').value = t;
+      }
+    } catch {}
+  }
+
+  async function saveCountdown() {
+    const name = $('cd-name').value.trim();
+    const date = $('cd-date').value;
+    const msg = $('cd-msg');
+    if (!name || !date) { msg.textContent = '请填写名称和日期'; msg.dataset.kind = 'err'; return; }
+    msg.textContent = '保存中…'; msg.dataset.kind = '';
+    const target = date + 'T00:00:00';
+    const { error } = await supabase
+      .from('site_settings')
+      .upsert({ key: 'countdown', value: { name, target }, updated_at: new Date().toISOString() });
+    if (error) { msg.textContent = '保存失败：' + error.message; msg.dataset.kind = 'err'; }
+    else { msg.textContent = '已保存 ✓ 首页刷新即生效'; msg.dataset.kind = 'ok'; }
   }
 
   // ---------- 表单 ----------
@@ -494,6 +530,7 @@ export const prerender = true;
     $('save-draft-btn').onclick = saveDraft;
     $('publish-btn').onclick = publish;
     $('new-btn').onclick = () => { setForm({}); setMsg(''); };
+    $('cd-save').onclick = saveCountdown;
     $('delete-btn').onclick = async () => {
       if (!state.id) return;
       const { data: cur } = await supabase.from('posts').select('title').eq('id', state.id).single();

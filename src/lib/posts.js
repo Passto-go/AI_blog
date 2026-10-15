@@ -39,21 +39,45 @@ function normalize(p) {
   };
 }
 
-// 按语言取文章（无 lang 字段视为默认中文）
+// 文章为「语言中立」：同一篇文章在所有语言视图下都展示，仅 UI 文案随语言切换。
+// 若某语言存在独立翻译（同 base slug、不同 -en / -ja 后缀），由 getPost / findTranslation 解析。
 export async function getPosts(lang = 'zh') {
   const all = (await fetchAll()).map(normalize);
-  return all
-    .filter((p) => p.lang === lang)
-    .sort(byDateDesc);
+  return all.sort(byDateDesc);
 }
 
 export async function getAllPosts() {
   return (await fetchAll()).map(normalize).sort(byDateDesc);
 }
 
+// 语言无关的文章查找：保证任何语言视图下都能取到内容（中文原文兜底），永不空页。
+// 优先级：① 同 slug + 目标语言（精确翻译）② 同 base slug 的目标语言翻译 ③ 同 slug 任意语言（原文）
 export async function getPost(slug, lang = 'zh') {
-  const all = (await getPosts(lang)).map(normalize);
-  return all.find((p) => p.slug === slug) || null;
+  const all = (await fetchAll()).map(normalize);
+  let p = all.find((x) => x.slug === slug && (x.lang || 'zh') === lang);
+  if (p) return p;
+  const base = baseSlug(slug);
+  p = all.find((x) => baseSlug(x.slug) === base && (x.lang || 'zh') === lang);
+  if (p) return p;
+  p = all.find((x) => x.slug === slug);
+  return p || null;
+}
+
+// 读取站点动态配置（如倒计时）。表不存在 / 未配置时返回 null，调用方回退默认值。
+export async function getSetting(key) {
+  if (!URL || !KEY) return null;
+  try {
+    const supabase = createClient(URL, KEY, { auth: { persistSession: false } });
+    const { data, error } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', key)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data.value;
+  } catch {
+    return null;
+  }
 }
 
 // 分类列表（含每类文章数）
