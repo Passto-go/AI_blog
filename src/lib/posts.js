@@ -52,14 +52,18 @@ export async function getAllPosts() {
 
 // 语言无关的文章查找：保证任何语言视图下都能取到内容（中文原文兜底），永不空页。
 // 优先级：① 同 slug + 目标语言（精确翻译）② 同 base slug 的目标语言翻译 ③ 同 slug 任意语言（原文）
+// 按「slug 约定」解析文章：同一篇的三种语言版本 slug 为 base(zh) / base-en / base-ja。
+// 仅依赖 slug 约定匹配，不依赖 lang 字段——发布后台未强制语言选择，翻译文章的 lang
+// 常是默认 'zh'，若按 lang 过滤会匹配失败、回退中文（即「非中文进文章仍显示中文」的根因）。
 export async function getPost(slug, lang = 'zh') {
   const all = (await fetchAll()).map(normalize);
-  let p = all.find((x) => x.slug === slug && (x.lang || 'zh') === lang);
-  if (p) return p;
   const base = baseSlug(slug);
-  p = all.find((x) => baseSlug(x.slug) === base && (x.lang || 'zh') === lang);
+  const targetSlug = lang === 'zh' ? base : `${base}-${lang}`;
+  let p = all.find((x) => x.slug === targetSlug);
   if (p) return p;
   p = all.find((x) => x.slug === slug);
+  if (p) return p;
+  p = all.find((x) => x.slug === base);
   return p || null;
 }
 
@@ -113,21 +117,14 @@ export function baseSlug(slug) {
   return String(slug).replace(/-(en|ja)$/, '');
 }
 
-// 按约定查找文章在其他语言下的对应版本（文章的 slug 按语言独立命名：
-// 如 hello / hello-en / hello-ja 是同一篇的三种语言；也兼容三语言共用同一个 slug、仅靠 lang 字段区分）。
-// 注意：getPosts() 自 7587c4a 起为「语言中立」（返回全部文章，不再按 lang 过滤），
-// 因此这里必须显式按 (p.lang === targetLang) 过滤，否则 p.slug === slug 会先命中当前语言版本
-// （例如中文原文 hello），导致切换语言后实际仍指向中文内容。
+// 按「slug 约定」查找文章在其他语言下的对应版本：base(zh) / base-en / base-ja 是同一篇的三种语言。
+// 仅按 slug 匹配（不依赖 lang 字段），否则翻译文章 lang 为默认 'zh' 时匹配失败，
+// 会回退到首页（即「中文文章页切语言跳回首页」的根因）。
 export async function findTranslation(slug, targetLang) {
   const posts = await getPosts(targetLang); // 返回全部文章（语言中立）
   const base = baseSlug(slug);
-  const matches = (p) =>
-    (p.lang || 'zh') === targetLang &&
-    (p.slug === slug ||
-      p.slug === base ||
-      p.slug === `${base}-${targetLang}` ||
-      baseSlug(p.slug) === base);
-  return posts.find(matches) || null;
+  const targetSlug = targetLang === 'zh' ? base : `${base}-${targetLang}`;
+  return posts.find((p) => p.slug === targetSlug) || null;
 }
 
 // 渲染 Markdown，并为 h2/h3 生成锚点 id；返回 { html, headings(用于目录) }

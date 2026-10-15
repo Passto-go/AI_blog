@@ -115,10 +115,10 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     } catch (e) { return iso; }
   }
 
-  // 渲染一条「公开」评论（已通过）
-  function renderPublicItem(list, c, lang) {
+  // 渲染一条「公开」评论（已通过）。isReply=true 表示为管理员回复，缩进展示
+  function renderPublicItem(list, c, lang, isReply) {
     const li = document.createElement('li');
-    li.className = 'comment-item';
+    li.className = 'comment-item' + (isReply ? ' comment-reply' : '');
     li.dataset.id = c.id;
 
     const head = document.createElement('div');
@@ -127,12 +127,19 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     const name = document.createElement('span');
     name.className = 'comment-author';
     name.textContent = c.author || '匿名';
+    head.appendChild(name);
+
+    // 管理员身份徽标
+    if (c.is_admin) {
+      const badge = document.createElement('span');
+      badge.className = 'comment-badge comment-badge--admin';
+      badge.textContent = lang === 'en' ? 'Admin' : lang === 'ja' ? '管理者' : '管理员';
+      head.appendChild(badge);
+    }
 
     const time = document.createElement('span');
     time.className = 'comment-time';
     time.textContent = fmtDate(c.created_at, lang);
-
-    head.appendChild(name);
     head.appendChild(time);
 
     const body = document.createElement('p');
@@ -327,7 +334,7 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
       try {
         const { data, error } = await supabase
           .from('comments')
-          .select('id, author, content, created_at')
+          .select('id, author, content, created_at, parent_id, is_admin')
           .eq('page', page)
           .eq('approved', true)
           .order('created_at', { ascending: true });
@@ -339,9 +346,38 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
         hideListError();
         listEl.innerHTML = '';
         const rows = (data || []).filter((c) => !myIds.has(c.id));
-        rows.forEach((c) => renderPublicItem(listEl, c, lang));
-        countEl.textContent = String(rows.length);
-        emptyEl.hidden = rows.length > 0;
+
+        // 顶层评论（无 parent_id）；回复按 parent_id 归组
+        const tops = rows.filter((c) => !c.parent_id);
+        const topIds = new Set(tops.map((c) => c.id));
+        const repliesByParent = {};
+        const orphans = []; // 父评论不在公开列表（如本人评论）的回复，单独置顶展示
+        rows.forEach((c) => {
+          if (!c.parent_id) return;
+          if (topIds.has(c.parent_id)) {
+            (repliesByParent[c.parent_id] = repliesByParent[c.parent_id] || []).push(c);
+          } else {
+            orphans.push(c);
+          }
+        });
+
+        let total = 0;
+        tops.forEach((c) => {
+          total++;
+          const li = renderPublicItem(listEl, c, lang, false);
+          const reps = repliesByParent[c.id] || [];
+          if (reps.length) {
+            const ulRep = document.createElement('ul');
+            ulRep.className = 'comment-replies';
+            reps.forEach((r) => { total++; renderPublicItem(ulRep, r, lang, true); });
+            li.appendChild(ulRep);
+          }
+        });
+        // 孤儿回复：父评论不可见时，仍独立展示（带缩进，标明是回复）
+        orphans.forEach((c) => { total++; renderPublicItem(listEl, c, lang, true); });
+
+        countEl.textContent = String(total);
+        emptyEl.hidden = total > 0;
       } catch (e) {
         console.warn('[comments] load threw', e);
         showListError((e && e.message) || String(e));
@@ -361,24 +397,11 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
         .on('postgres_changes', {
           event: 'INSERT', schema: 'public', table: 'comments',
           filter: 'page=eq.' + page,
-        }, (payload) => {
-          const c = payload.new;
-          if (c && c.approved && !myIds.has(c.id)) {
-            renderPublicItem(listEl, c, lang);
-            recountPublic();
-          }
-        })
+        }, () => { loadPublic(); })
         .on('postgres_changes', {
           event: 'UPDATE', schema: 'public', table: 'comments',
           filter: 'page=eq.' + page,
-        }, (payload) => {
-          const c = payload.new;
-          // 审核通过（且非本人评论，本人的已在「我的评论」面板）则加入公开列表
-          if (c && c.approved && !myIds.has(c.id)) {
-            const existing = listEl.querySelector('[data-id="' + c.id + '"]');
-            if (!existing) { renderPublicItem(listEl, c, lang); recountPublic(); }
-          }
-        })
+        }, () => { loadPublic(); })
         .subscribe(function (status) {
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             console.warn('[comments] realtime 订阅失败（不影响显示，刷新页面即可）');

@@ -146,6 +146,7 @@ export const prerender = true;
 <script>
   import { createClient } from '@supabase/supabase-js';
   import { marked } from 'marked';
+  import { site } from '../data/site.js';
 
   const URL = import.meta.env.PUBLIC_SUPABASE_URL;
   const KEY = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
@@ -243,15 +244,19 @@ export const prerender = true;
 
   function renderCommentItem(c) {
     const li = document.createElement('li');
-    li.className = 'wb-cm-item';
+    li.className = 'wb-cm-item' + (c.parent_id ? ' wb-cm-item--reply' : '');
     const st = cmStatusOf(c);
     const d = c.created_at ? new Date(c.created_at).toLocaleString('zh-CN') : '';
+    const metaExtra = [];
+    if (c.is_admin) metaExtra.push('<span class="wb-cm-badge wb-cm-badge--admin">管理员</span>');
+    if (c.parent_id) metaExtra.push('<span class="wb-cm-replyof">↳ 回复</span>');
     const body = document.createElement('div');
     body.className = 'wb-cm-body';
     body.innerHTML =
       `<div class="wb-cm-meta">
          <span class="wb-cm-author">${escapeHtml(c.author || '匿名')}</span>
          <span class="wb-badge wb-cm-status wb-cm-status--${st}">${CM_STATUS_LABEL[st]}</span>
+         ${metaExtra.join('')}
          <span class="wb-cm-page">${escapeHtml(c.page || '')}</span>
        </div>
        <div class="wb-cm-text">${escapeHtml(c.content || '')}</div>
@@ -277,6 +282,14 @@ export const prerender = true;
       reject.onclick = () => moderate(c.id, false, true);
       acts.appendChild(reject);
     }
+    // 管理员回复入口
+    const replyBtn = document.createElement('button');
+    replyBtn.type = 'button';
+    replyBtn.className = 'wb-cm-act wb-cm-reply';
+    replyBtn.textContent = '回复';
+    replyBtn.onclick = () => toggleReplyForm(c, li, replyBtn);
+    acts.appendChild(replyBtn);
+
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'wb-cm-act wb-cm-del';
@@ -290,6 +303,55 @@ export const prerender = true;
     acts.appendChild(del);
     li.appendChild(acts);
     return li;
+  }
+
+  // 切换某条评论的内联回复框
+  function toggleReplyForm(c, li, btn) {
+    const exist = li.querySelector('.wb-cm-replybox');
+    if (exist) { exist.remove(); return; }
+    const box = document.createElement('div');
+    box.className = 'wb-cm-replybox';
+    box.innerHTML = '<textarea class="wb-cm-replytext" placeholder="以管理员身份回复，发送后即发即显"></textarea>';
+    const row = document.createElement('div');
+    row.className = 'wb-cm-replyrow';
+    const send = document.createElement('button');
+    send.type = 'button';
+    send.className = 'wb-cm-act wb-cm-send';
+    send.textContent = '发送回复';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'wb-cm-act';
+    cancel.textContent = '取消';
+    cancel.onclick = () => box.remove();
+    send.onclick = async () => {
+      const ta = box.querySelector('.wb-cm-replytext');
+      const val = (ta.value || '').trim();
+      if (!val) { alert('回复内容不能为空'); return; }
+      send.textContent = '发送中…'; send.disabled = true;
+      const ok = await replyTo(c, val);
+      if (ok) { box.remove(); await loadComments(); }
+      else { send.textContent = '发送回复'; send.disabled = false; }
+    };
+    row.append(send, cancel);
+    box.appendChild(row);
+    li.appendChild(box);
+    box.querySelector('.wb-cm-replytext').focus();
+  }
+
+  // 管理员回复：作为一条 is_admin=true、approved=true 的评论插入，parent_id 关联原评论
+  async function replyTo(parent, content) {
+    const { error } = await supabase.from('comments').insert({
+      page: parent.page,
+      author: (site && site.author) || '老一贯',
+      email: '',
+      content: content.slice(0, 1000),
+      approved: true,
+      rejected: false,
+      parent_id: parent.id,
+      is_admin: true,
+    });
+    if (error) { alert('回复失败：' + error.message); return false; }
+    return true;
   }
 
   async function moderate(id, approved, rejected) {

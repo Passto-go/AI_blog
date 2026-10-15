@@ -227,6 +227,42 @@ end;
 $$;
 
 -- ============================================================
+-- 管理员回复评论（幂等，重复执行安全）
+-- 设计要点：
+--   · parent_id 关联原评论；is_admin 标记管理员身份（普通用户无法伪造）
+--   · 管理员回复由已登录后台经 authenticated 策略写入，approved=true 即发即显
+--   · 匿名提交走 add_comment RPC（security definer），固定 is_admin=false，无法冒充管理员
+--   · 顶层评论 parent_id 为 null；回复 parent_id 指向被回复评论（支持多级嵌套）
+-- ============================================================
+
+-- 新增关联与身份字段（已存在则跳过）
+alter table comments add column if not exists parent_id uuid references comments(id) on delete cascade;
+alter table comments add column if not exists is_admin boolean not null default false;
+
+-- 已登录（管理员）：可插入评论（如管理员回复，approved=true 即发即显；可写 is_admin=true）
+drop policy if exists "authenticated insert comments" on comments;
+create policy "authenticated insert comments"
+  on comments for insert
+  to authenticated
+  with check (true);
+
+-- 匿名插入：禁止冒充管理员（is_admin 必须为 false），且仍为先审后放
+drop policy if exists "public insert comments" on comments;
+create policy "public insert comments"
+  on comments for insert
+  with check (
+    char_length(author) between 1 and 40
+    and char_length(email) <= 120
+    and (email = '' or email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$')
+    and char_length(content) between 1 and 1000
+    and (approved is not true)
+    and (rejected is not true)
+    and (is_admin is not true)
+  );
+
+create index if not exists comments_parent_idx on comments (parent_id);
+
+-- ============================================================
 -- 自查（可选）：
 --   select policyname from pg_policies where tablename = 'comments';
 --   select column_name, data_type, column_default

@@ -171,12 +171,13 @@ a { color: inherit; }
   font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: 1px;
   margin: 0 0 10px; display: flex; align-items: center; gap: 6px;
 }
-.widget-quote { font-size: 15px; line-height: 1.7; color: var(--text); min-height: 52px; }
+.widget-quote { font-size: 15px; line-height: 1.7; color: var(--text); min-height: 52px; overflow-wrap: anywhere; }
 .quote-src { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; text-align: right; }
-.countdown-label { font-size: 14px; color: var(--muted); margin: 0 0 10px; }
+/* 倒计时：目标名过长时允许换行，避免撑破卡片 */
+.countdown-label { font-size: 14px; color: var(--muted); margin: 0 0 10px; line-height: 1.6; overflow-wrap: anywhere; }
 .countdown-grid { display: flex; gap: 10px; }
-.cd-cell { flex: 1; text-align: center; background: var(--surface-2); border-radius: 10px; padding: 10px 4px; }
-.cd-num { font-size: 22px; font-weight: 800; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.cd-cell { flex: 1; min-width: 0; text-align: center; background: var(--surface-2); border-radius: 10px; padding: 10px 4px; }
+.cd-num { font-size: 22px; font-weight: 800; color: var(--text-strong); font-variant-numeric: tabular-nums; line-height: 1.25; }
 .cd-lbl { font-size: 11px; color: var(--muted); }
 
 /* 文章列表（板块式） */
@@ -263,6 +264,34 @@ a { color: inherit; }
 .content code { background: var(--code-bg); padding: 2px 6px; border-radius: 5px; font-size: .92em; }
 .content pre { background: #0f1420; color: #e6e9f0; padding: 16px; border-radius: 10px; overflow: auto; }
 .content pre code { background: none; padding: 0; color: inherit; }
+/* 文章正文表格：补齐缺失样式，修复裸表导致的列错位/无边框/宽表溢出 */
+.content table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 1.4em 0;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.content th, .content td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.6;
+}
+.content thead th {
+  background: var(--code-bg);
+  color: var(--text-strong);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.content tbody tr:nth-child(2n) td { background: var(--bg); }
+.content table th[align="right"], .content table td[align="right"] { text-align: right; }
+.content table th[align="center"], .content table td[align="center"] { text-align: center; }
 .back { margin-top: 32px; }
 .back a { color: var(--accent); text-decoration: none; }
 
@@ -462,6 +491,23 @@ a { color: inherit; }
 [data-theme="dark"] .wb-cm-approve:hover { color: #3fb950; border-color: #1f4f2b; }
 [data-theme="dark"] .wb-cm-reject:hover { color: #d29922; border-color: #4d3d17; }
 [data-theme="dark"] .wb-cm-del:hover { color: #f85149; border-color: #652b2b; }
+/* 评论管理：管理员回复入口与内联回复框 */
+.wb-cm-item--reply { padding-left: 14px; border-left: 2px solid var(--border); }
+.wb-cm-badge { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 1px 7px; border: 1px solid; }
+.wb-cm-badge--admin { color: #0969da; border-color: #c9e0ff; background: #eef5ff; }
+[data-theme="dark"] .wb-cm-badge--admin { color: #58a6ff; border-color: #1f3b5c; background: #112031; }
+.wb-cm-replyof { font-size: 11.5px; color: var(--muted); }
+.wb-cm-reply { color: #0969da; border-color: #c9e0ff; }
+.wb-cm-reply:hover { background: #eef5ff; }
+[data-theme="dark"] .wb-cm-reply { color: #58a6ff; border-color: #1f3b5c; }
+[data-theme="dark"] .wb-cm-reply:hover { background: #112031; }
+.wb-cm-replybox { margin-top: 10px; }
+.wb-cm-replytext { width: 100%; min-height: 60px; box-sizing: border-box; font: inherit; font-size: 13px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; resize: vertical; }
+.wb-cm-replyrow { display: flex; gap: 6px; margin-top: 6px; }
+.wb-cm-send { color: #1a7f37; border-color: #b7e4c7; }
+.wb-cm-send:hover { background: #eafaef; }
+[data-theme="dark"] .wb-cm-send { color: #3fb950; border-color: #1f4f2b; }
+[data-theme="dark"] .wb-cm-send:hover { background: #12261a; }
 .wb-empty { font-size: 13px; color: var(--muted); text-align: center; padding: 20px 0; list-style: none; }
 
 /* 响应式：窄屏单栏 */
@@ -572,6 +618,17 @@ a { color: inherit; }
   .post-aside-left { position: static; max-height: none; overflow: visible; order: 2; }
 }
 
+/* 移动端（平板/手机）：侧栏 banner 模块改为横向自适应，倒计时四格等分 */
+@media (max-width: 900px) {
+  .post-aside-left { gap: 14px; }
+  .post-main { padding: 26px 24px; }
+  .profile-card { padding: 18px; }
+  .widget { padding: 16px 18px; }
+  .countdown-grid { gap: 8px; }
+  .cd-num { font-size: 20px; }
+  .cd-cell { padding: 8px 2px; }
+}
+
 /* 侧栏卡片 */
 .aside-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow);
@@ -613,17 +670,54 @@ a { color: inherit; }
 .post-card-cover img { width: 100%; height: 100%; object-fit: cover; }
 .post-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
 
-@media (max-width: 920px) {
-  .post-layout { grid-template-columns: 1fr; grid-template-areas: "main" "right"; }
-  .post-aside { position: static; flex-direction: column; }
-  .post-aside-right { max-height: none; overflow-y: visible; }
-  .post-main { padding: 24px 20px; }
-}
 @media (max-width: 600px) {
   .post-card { flex-direction: column; }
   .post-card-cover { width: 100%; height: 170px; }
   .post-head { padding: 0 16px; }
   .post-cover { padding: 0 16px; }
+}
+
+/* ============ 移动端适配：文章页侧栏模块 + 倒计时 ============ */
+@media (max-width: 640px) {
+  /* 布局：减小留白，正文卡片与侧栏模块铺满屏宽 */
+  .post-layout { margin: 16px auto; padding: 0 14px; gap: 16px; }
+  .post-head { margin-top: 22px; padding: 0 16px; }
+  .post-title { font-size: clamp(22px, 7vw, 30px); }
+  .post-main { padding: 22px 18px; }
+  .post-lead { font-size: 15px; }
+  /* 侧栏左栏：模块间距收紧，避免堆叠后过于松散或紧贴 */
+  .post-aside-left { gap: 12px; }
+
+  /* 资料卡：移动端横向紧凑排布（头像 + 名称/简介 并排），统计与社交图标保持整行 */
+  .profile-card { padding: 16px; }
+  .profile-avatar { width: 64px; height: 64px; margin: 0 auto 10px; font-size: 26px; }
+  .profile-name { font-size: 17px; }
+  .profile-tagline { font-size: 13px; margin-bottom: 12px; }
+  .profile-stats { padding: 12px 0; gap: 6px; }
+  .profile-socials { gap: 16px; margin-top: 14px; }
+
+  /* 通用小组件：收紧内边距，保证内容不贴边 */
+  .widget { padding: 15px 16px; }
+  .widget-title { font-size: 12.5px; letter-spacing: .6px; }
+  .widget-quote { font-size: 14.5px; min-height: 0; }
+
+  /* 倒计时：整行铺满、四格等分、数字与标签层级清晰、杜绝溢出 */
+  .countdown-label { font-size: 13px; margin-bottom: 10px; }
+  .countdown-grid { gap: 6px; }
+  .cd-cell { padding: 9px 2px; border-radius: 9px; }
+  .cd-num { font-size: clamp(17px, 5.2vw, 20px); line-height: 1.2; }
+  .cd-lbl { font-size: 10.5px; margin-top: 1px; }
+}
+
+/* 超窄屏（小屏手机）：进一步压缩，优先保证可读与不溢出 */
+@media (max-width: 380px) {
+  .post-layout { padding: 0 12px; }
+  .post-main { padding: 18px 14px; }
+  .widget { padding: 14px 14px; }
+  .countdown-grid { gap: 5px; }
+  .cd-num { font-size: 16px; }
+  .cd-lbl { font-size: 10px; }
+  .profile-avatar { width: 58px; height: 58px; font-size: 24px; }
 }
 
 /* ================= 评论区 ================= */
@@ -676,6 +770,12 @@ a { color: inherit; }
 .comment-author { font-weight: 600; color: var(--text-strong); font-size: 14px; }
 .comment-time { font-size: 12px; color: var(--muted); }
 .comment-body { margin: 0; color: var(--text); line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+/* 管理员回复：嵌套缩进展示 */
+.comment-replies { list-style: none; margin: 12px 0 0; padding: 0 0 0 16px; border-left: 2px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
+.comment-reply { background: var(--surface); }
+.comment-badge { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 1px 8px; border: 1px solid; white-space: nowrap; }
+.comment-badge--admin { color: #0969da; border-color: #c9e0ff; background: #eef5ff; }
+[data-theme="dark"] .comment-badge--admin { color: #58a6ff; border-color: #1f3b5c; background: #112031; }
 .comments-empty { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
 .comments-note { color: var(--muted); font-size: 14px; margin: 0; }
 
