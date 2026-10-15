@@ -63,8 +63,14 @@ export const prerender = true;
                   <button type="button" data-v="en">EN</button>
                   <button type="button" data-v="ja">日本語</button>
                 </div>
-                <input id="f-category" class="wb-cat" list="cat-list" placeholder="分类（可选）" />
-                <datalist id="cat-list"></datalist>
+                <select id="f-category" class="wb-cat" aria-label="分类"></select>
+                <div id="new-cat-box" class="wb-cat-new" hidden>
+                  <span class="wb-cat-new-label">新建分类</span>
+                  <input id="new-cat-name" class="wb-cat" placeholder="显示名，如：技术随笔" />
+                  <input id="new-cat-slug" class="wb-cat" placeholder="slug（留空自动生成）" />
+                  <span id="new-cat-preview" class="wb-cat-slug-preview"></span>
+                  <span class="wb-hint wb-cat-new-hint">名称＝前台显示的分类名；Slug＝网址里的英文后缀（仅小写字母/数字/-）。</span>
+                </div>
                 <div class="wb-seg" id="f-status" role="group" aria-label="状态">
                   <button type="button" data-v="draft" class="on">草稿</button>
                   <button type="button" data-v="published">已发布</button>
@@ -104,7 +110,6 @@ export const prerender = true;
                   <label>Slug<input id="f-slug" placeholder="留空自动生成" /><small id="slug-hint" class="wb-hint"></small></label>
                   <label>摘要<input id="f-excerpt" placeholder="一句话摘要" /></label>
                   <label>封面 URL<input id="f-cover" placeholder="https://…" /></label>
-                  <label>分类 Slug<input id="f-catslug" placeholder="留空自动生成" /></label>
                 </div>
               </details>
 
@@ -170,8 +175,18 @@ export const prerender = true;
               <strong>分类管理</strong>
               <span id="cat-count" class="wb-hint"></span>
             </div>
-            <p class="wb-hint wb-cat-note">重命名会同步修改该分类下所有文章的分类名与 URL（slug）；改名后旧的分类链接将失效。</p>
+            <p class="wb-hint wb-cat-note">重命名会同步修改该分类下所有文章的分类名与 URL（slug）；改名后旧的分类链接将失效。合并/删除同理会同步文章。</p>
+            <button id="cat-add-btn" class="wb-cat-add" type="button">＋ 新增分类</button>
             <ul id="cat-list-manage" class="wb-list"></ul>
+            <div id="cat-add-box" class="wb-cat-new wb-cat-new--manage" hidden>
+              <input id="cat-add-name" class="wb-cat" placeholder="显示名，如：技术随笔" />
+              <input id="cat-add-slug" class="wb-cat" placeholder="slug（留空自动生成，仅小写字母/数字/连字符）" />
+              <span id="cat-add-preview" class="wb-cat-slug-preview"></span>
+              <span class="wb-hint wb-cat-new-hint">名称＝前台显示的分类名；Slug＝网址里的英文后缀（仅小写字母/数字/-）。</span>
+              <button id="cat-add-save" class="wb-cat-act" type="button">保存</button>
+              <button id="cat-add-cancel" class="wb-cat-act wb-cat-cancel" type="button">取消</button>
+              <span id="cat-add-msg" class="wb-cat-rename-msg"></span>
+            </div>
           </div>
         </div>
       </section>
@@ -194,7 +209,7 @@ export const prerender = true;
   let supabase = null;
 
   // 当前编辑态
-  const state = { id: '', lang: 'zh', status: 'draft', filter: 'all', query: '', saving: false };
+  const state = { id: '', lang: 'zh', status: 'draft', filter: 'all', query: '', saving: false, catSlug: '', catName: '' };
 
   const LANGS = { zh: '中文', en: 'EN', ja: '日本語' };
 
@@ -415,17 +430,26 @@ export const prerender = true;
     if (!ul) return;
     let rows;
     try {
-      const { data, error } = await supabase.from('posts').select('category, category_slug');
+      const { data: posts, error } = await supabase.from('posts').select('category, category_slug');
       if (error) { ul.innerHTML = '<li class="wb-empty">读取失败：' + error.message + '</li>'; return; }
       const map = new Map();
-      (data || []).forEach((p) => {
+      (posts || []).forEach((p) => {
         const name = (p.category || '').trim();
-        if (!name) return;
         const slug = (p.category_slug || '').trim() || slugify(name) || 'uncategorized';
-        if (!map.has(slug)) map.set(slug, { name, slug, count: 0 });
+        if (!name && slug === 'uncategorized') return;
+        if (!map.has(slug)) map.set(slug, { name: name || slug, slug, count: 0 });
         map.get(slug).count++;
       });
-      rows = [...map.values()].sort((a, b) => b.count - a.count);
+      // 注册表（含 0 篇的新增分类），名称以注册表为准
+      try {
+        const { data: reg } = await supabase.from('categories').select('name, slug');
+        (reg || []).forEach((r) => {
+          if (!r.slug) return;
+          if (!map.has(r.slug)) map.set(r.slug, { name: r.name || r.slug, slug: r.slug, count: 0 });
+          else map.get(r.slug).name = r.name || map.get(r.slug).name;
+        });
+      } catch {}
+      rows = [...map.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
     } catch (e) {
       ul.innerHTML = '<li class="wb-empty">读取失败：' + (e?.message || e) + '</li>';
       return;
@@ -468,7 +492,8 @@ export const prerender = true;
     const mergeBtn = document.createElement('button');
     mergeBtn.type = 'button';
     mergeBtn.className = 'wb-cat-act';
-    mergeBtn.textContent = '合并到…';
+    mergeBtn.textContent = '合并到';
+    mergeBtn.title = '把该分类下的文章合并到右侧选中的分类';
     mergeBtn.onclick = async () => {
       const target = all.find((o) => o.slug === sel.value);
       if (!target) return;
@@ -476,7 +501,7 @@ export const prerender = true;
       mergeBtn.textContent = '合并中…'; mergeBtn.disabled = true;
       const ok = await mergeCategory(c, target);
       if (ok) { await loadCatManage(); }
-      else { mergeBtn.textContent = '合并到…'; mergeBtn.disabled = false; }
+      else { mergeBtn.textContent = '合并到'; mergeBtn.disabled = false; }
     };
 
     const del = document.createElement('button');
@@ -491,7 +516,9 @@ export const prerender = true;
       else { del.textContent = '删除'; del.disabled = false; }
     };
 
-    acts.append(renameBtn, sel, mergeBtn, del);
+    // 顺序：重命名 →「合并到」+ 目标下拉 → 删除
+    // （「合并到」标签在前、目标下拉在后，读起来是「合并到 [目标]」，且整体位于重命名之后）
+    acts.append(renameBtn, mergeBtn, sel, del);
     li.appendChild(acts);
     return li;
   }
@@ -563,6 +590,10 @@ export const prerender = true;
       .from('posts').update({ category: newName, category_slug: newSlug })
       .eq('category_slug', src.slug);
     if (error) { alert('重命名失败：' + error.message); return false; }
+    // 同步注册表（best-effort）
+    try {
+      await supabase.from('categories').update({ name: newName, slug: newSlug }).eq('slug', src.slug);
+    } catch {}
     try {
       // 2) 级联：原本指向旧 slug 的别名，改指向新 slug（处理 A→B→C 链路）
       await supabase.from('category_aliases').update({ new_slug: newSlug }).eq('new_slug', src.slug);
@@ -583,6 +614,11 @@ export const prerender = true;
       .from('posts').update({ category: dst.name, category_slug: dst.slug })
       .eq('category_slug', src.slug);
     if (error) { alert('合并失败：' + error.message); return false; }
+    // 同步注册表（best-effort）：确保目标存在，删除源
+    try {
+      await supabase.from('categories').upsert({ name: dst.name, slug: dst.slug }, { onConflict: 'slug' });
+      await supabase.from('categories').delete().eq('slug', src.slug);
+    } catch {}
     return true;
   }
 
@@ -591,6 +627,8 @@ export const prerender = true;
       .from('posts').update({ category: '', category_slug: 'uncategorized' })
       .eq('category_slug', src.slug);
     if (error) { alert('删除失败：' + error.message); return false; }
+    // 同步删除注册表条目（best-effort）
+    try { await supabase.from('categories').delete().eq('slug', src.slug); } catch {}
     return true;
   }
 
@@ -719,8 +757,10 @@ export const prerender = true;
     state.id = p.id || '';
     $('f-title').value = p.title || '';
     $('f-slug').value = p.slug || '';
-    $('f-category').value = p.category || '';
-    $('f-catslug').value = p.category_slug || '';
+    state.catSlug = p.category_slug || (p.category ? slugify(p.category) : '');
+    state.catName = p.category || '';
+    renderCategorySelect(state.catSlug, state.catName);
+    toggleNewCat(false);
     $('f-excerpt').value = p.excerpt || '';
     $('f-cover').value = p.cover || '';
     $('f-content').value = p.content || '';
@@ -742,13 +782,24 @@ export const prerender = true;
 
   function collectRow() {
     const title = $('f-title').value.trim();
-    const category = $('f-category').value.trim();
+    const sel = $('f-category').value;
+    let category = '';
+    let category_slug = 'uncategorized';
+    if (sel === '__new__') {
+      const nm = $('new-cat-name').value.trim();
+      category = nm;
+      category_slug = $('new-cat-slug').value.trim() || slugify(nm) || 'uncategorized';
+    } else if (sel) {
+      const o = $('f-category').selectedOptions[0];
+      category = (o && (o.dataset.name || o.textContent || '')).trim() || '';
+      category_slug = sel;
+    }
     return {
       title,
       slug: $('f-slug').value.trim() || autoSlug(title, state.lang),
       lang: state.lang,
       category,
-      category_slug: $('f-catslug').value.trim() || slugify(category) || 'uncategorized',
+      category_slug,
       excerpt: $('f-excerpt').value.trim(),
       cover: $('f-cover').value.trim(),
       content: $('f-content').value,
@@ -809,6 +860,19 @@ export const prerender = true;
     const row = collectRow();
     if (!row.title) { setMsg('请先填写标题', 'err'); $('f-title').focus(); return null; }
 
+    // 新建分类合法性校验
+    if ($('f-category').value === '__new__') {
+      const nm = $('new-cat-name').value.trim();
+      if (!nm) { setMsg('新建分类请填写显示名', 'err'); $('new-cat-name').focus(); return null; }
+      const ns = $('new-cat-slug').value.trim() || slugify(nm);
+      if (!/^[a-z0-9-]+$/.test(ns)) {
+        setMsg('分类 Slug 只能是小写字母、数字和连字符', 'err'); $('new-cat-slug').focus(); return null;
+      }
+      if (catOpts.some((c) => c.slug === ns)) {
+        setMsg('该分类 Slug 已存在', 'err'); $('new-cat-slug').focus(); return null;
+      }
+    }
+
     // 防重复提交：快速连点「发布」会出现两次 INSERT 同一 slug，后一次必撞唯一约束
     if (state.saving) return null;
     state.saving = true;
@@ -836,6 +900,15 @@ export const prerender = true;
         const r = await supabase.from('posts').insert({ ...row, published_at: new Date().toISOString() });
         error = r.error;
         if (!error && r.data?.[0]) state.id = r.data[0].id;
+      }
+      // 新建分类：同步写入注册表（best-effort，categories 表未建也不影响文章发布）
+      if (!error && $('f-category').value === '__new__' && row.category) {
+        try {
+          await supabase.from('categories').upsert(
+            { name: row.category, slug: row.category_slug },
+            { onConflict: 'slug' }
+          );
+        } catch {}
       }
     } finally {
       state.saving = false;
@@ -901,18 +974,29 @@ export const prerender = true;
       const li = document.createElement('li');
       li.className = 'wb-item' + (p.id === state.id ? ' on' : '');
 
-      const main = document.createElement('button');
-      main.type = 'button';
+      // 主体：标题 = 前台文章链接（新标签打开）；下方为元信息
+      const main = document.createElement('div');
       main.className = 'wb-item-main';
       const d = p.published_at ? new Date(p.published_at).toLocaleDateString('zh-CN') : '';
+      const url = postUrl(p);
       main.innerHTML =
-        `<span class="wb-item-title">${escapeHtml(p.title || '(无标题)')}</span>
+        `<a class="wb-item-title" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="在新标签打开前台文章页">${escapeHtml(p.title || '(无标题)')}</a>
          <span class="wb-item-meta">
            <span class="wb-badge">${LANGS[p.lang] || p.lang || 'zh'}</span>
            <span class="wb-badge ${p.published ? 'is-live' : 'is-draft'}">${p.published ? '已发布' : '草稿'}</span>
            <span class="wb-date">${d}</span>
          </span>`;
-      main.onclick = () => { setForm(p); setMsg('已载入《' + p.title + '》'); };
+
+      // 右侧操作区：编辑在上、删除在下
+      const acts = document.createElement('div');
+      acts.className = 'wb-item-acts';
+
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'wb-item-edit';
+      edit.textContent = '编辑';
+      edit.title = '在编辑器中打开修改';
+      edit.onclick = () => { setForm(p); setMsg('已载入《' + (p.title || '无标题') + '》'); };
 
       const del = document.createElement('button');
       del.type = 'button';
@@ -927,9 +1011,16 @@ export const prerender = true;
         await loadList();
       };
 
-      li.append(main, del);
+      acts.append(edit, del);
+      li.append(main, acts);
       ul.append(li);
     });
+  }
+
+  // 生成该文章对应的前台 URL（zh 为默认语言，无前缀）
+  function postUrl(p) {
+    const langPrefix = p.lang && p.lang !== 'zh' ? '/' + p.lang : '';
+    return langPrefix + '/posts/' + (p.slug || '') + '/';
   }
 
   async function loadList() {
@@ -937,14 +1028,86 @@ export const prerender = true;
       .from('posts').select('*').order('published_at', { ascending: false });
     if (error) { $('post-list').innerHTML = '<li class="wb-empty">读取失败：' + error.message + '</li>'; return; }
     allPosts = data || [];
-    renderCategories();
+    loadCategoryOptions();
     renderList();
     updateLangState();
   }
 
-  function renderCategories() {
-    const names = [...new Set(allPosts.map((p) => p.category).filter(Boolean))].sort();
-    $('cat-list').innerHTML = names.map((n) => `<option value="${escapeHtml(n)}"></option>`).join('');
+  // 加载编辑器「分类」下拉选项：注册表优先，缺表则回退文章去重分类
+  let catOpts = [];
+  async function loadCategoryOptions() {
+    const sel = $('f-category');
+    if (!sel) return;
+    try {
+      const { data, error } = await supabase.from('categories').select('name, slug').order('name');
+      if (!error && data) catOpts = data;
+    } catch { catOpts = []; }
+    if (!catOpts.length) {
+      catOpts = [...new Set(allPosts.map((p) => p.category_slug).filter(Boolean))]
+        .map((s) => ({ name: s, slug: s }));
+    }
+    renderCategorySelect(state.catSlug, state.catName);
+  }
+
+  function opt(value, text, name) {
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = text;
+    if (name != null) o.dataset.name = name;
+    return o;
+  }
+
+  // 渲染分类下拉：无分类 / 已有分类 / 当前值（历史脏数据兜底）/ 新建
+  function renderCategorySelect(curSlug, curName) {
+    const sel = $('f-category');
+    if (!sel) return;
+    sel.innerHTML = '';
+    sel.appendChild(opt('', '（无分类）'));
+    catOpts.forEach((c) => sel.appendChild(opt(c.slug, c.name || c.slug, c.name || c.slug)));
+    const inList = !curSlug || catOpts.some((c) => c.slug === curSlug);
+    if (curSlug && !inList) sel.appendChild(opt(curSlug, curName || curSlug, curName || curSlug));
+    sel.value = curSlug || '';
+    sel.appendChild(opt('__new__', '＋ 新建分类…'));
+    toggleNewCat(sel.value === '__new__');
+  }
+
+  function toggleNewCat(show) {
+    const box = $('new-cat-box');
+    if (box) box.hidden = !show;
+    if (show) { updateNewCatPreview(); const n = $('new-cat-name'); if (n) n.focus(); }
+  }
+
+  function updateNewCatPreview() {
+    const el = $('new-cat-preview');
+    if (!el) return;
+    const s = ($('new-cat-slug').value.trim() || slugify($('new-cat-name').value) || 'uncategorized');
+    el.textContent = '/' + s;
+  }
+
+  function updateCatAddPreview() {
+    const el = $('cat-add-preview');
+    if (!el) return;
+    const s = ($('cat-add-slug').value.trim() || slugify($('cat-add-name').value) || 'uncategorized');
+    el.textContent = '/' + s;
+  }
+
+  // 分类管理：新增分类（写入注册表，0 篇也会在前台显示）
+  async function addCategory() {
+    const name = $('cat-add-name').value.trim();
+    const msg = $('cat-add-msg');
+    if (!name) { msg.textContent = '请填写显示名'; return; }
+    let slug = $('cat-add-slug').value.trim() || slugify(name);
+    if (!/^[a-z0-9-]+$/.test(slug)) { msg.textContent = 'Slug 只能是小写字母、数字和连字符'; return; }
+    if (catOpts.some((c) => c.slug === slug)) { msg.textContent = '该 Slug 已存在'; return; }
+    const saveBtn = $('cat-add-save');
+    saveBtn.disabled = true; saveBtn.textContent = '保存中…';
+    const { error } = await supabase.from('categories').insert({ name, slug });
+    saveBtn.disabled = false; saveBtn.textContent = '保存';
+    if (error) { msg.textContent = '失败：' + error.message; return; }
+    $('cat-add-box').hidden = true;
+    $('cat-add-name').value = ''; $('cat-add-slug').value = ''; $('cat-add-preview').textContent = '';
+    await loadCatManage();
+    await loadCategoryOptions();
   }
 
   function escapeHtml(s) {
@@ -1053,6 +1216,17 @@ export const prerender = true;
     $('new-btn').onclick = () => { setForm({}); setMsg(''); };
     $('cd-save').onclick = saveCountdown;
 
+    // 分类管理：新增分类
+    $('cat-add-btn').onclick = () => {
+      const box = $('cat-add-box');
+      box.hidden = !box.hidden;
+      if (!box.hidden) { $('cat-add-name').focus(); updateCatAddPreview(); }
+    };
+    $('cat-add-save').onclick = addCategory;
+    $('cat-add-cancel').onclick = () => { $('cat-add-box').hidden = true; $('cat-add-msg').textContent = ''; };
+    $('cat-add-name').addEventListener('input', updateCatAddPreview);
+    $('cat-add-slug').addEventListener('input', updateCatAddPreview);
+
     // 一键翻译
     $('tr-en-btn').onclick = () => translateTo('en');
     $('tr-ja-btn').onclick = () => translateTo('ja');
@@ -1107,11 +1281,19 @@ export const prerender = true;
 
     // 正文输入：预览 + 自动保存
     $('f-content').addEventListener('input', () => { renderPreview(); saveLocalDraft(); });
-    ['f-title', 'f-category', 'f-excerpt', 'f-cover', 'f-slug', 'f-catslug'].forEach((id) => {
+    ['f-title', 'f-excerpt', 'f-cover', 'f-slug'].forEach((id) => {
       $(id).addEventListener('input', () => {
         if (id === 'f-title') updateSlugHint();
         saveLocalDraft();
       });
+    });
+    // 分类下拉 / 新建分类输入
+    $('f-category').addEventListener('change', () => {
+      toggleNewCat($('f-category').value === '__new__');
+      saveLocalDraft();
+    });
+    ['new-cat-name', 'new-cat-slug'].forEach((id) => {
+      $(id).addEventListener('input', () => { updateNewCatPreview(); saveLocalDraft(); });
     });
 
     // 图片上传

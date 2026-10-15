@@ -173,19 +173,55 @@ export async function getSetting(key) {
   }
 }
 
-// 分类列表（含每类文章数）
+// 分类列表（含每类文章数）。
+// 以 categories 注册表为「名称/Slug 权威源」，叠加已发布文章的实际计数；
+// 注册表缺失或查询失败时，降级为纯文章推导，保证站点不崩。
 export async function getCategories(lang = 'zh') {
   const posts = await getPosts(lang);
-  const map = new Map();
+
+  // 文章推导的计数（按 slug 归组）
+  const counts = new Map();
   for (const p of posts) {
-    const name = p.category || null;
-    const slug = p.categorySlug || (name ? slugify(name) : 'uncategorized');
-    const key = slug;
-    if (!map.has(key)) map.set(key, { name, slug, count: 0 });
-    map.get(key).count += 1;
-    if (name && !map.get(key).name) map.get(key).name = name;
+    const slug = p.categorySlug || 'uncategorized';
+    counts.set(slug, (counts.get(slug) || 0) + 1);
   }
-  return [...map.values()];
+
+  // 注册表（后台「新增分类」产生，可能 0 篇）
+  let registry = [];
+  try {
+    const supabase = createClient(URL, KEY, { auth: { persistSession: false } });
+    const { data, error } = await supabase
+      .from('categories')
+      .select('name, slug')
+      .order('created_at', { ascending: true });
+    if (!error && data) registry = data;
+  } catch {
+    registry = []; // 表尚未创建：忽略，按纯文章推导
+  }
+
+  const map = new Map();
+  // 先放注册表（名称权威，count 先 0）
+  for (const r of registry) {
+    if (!r.slug) continue;
+    map.set(r.slug, { name: r.name || r.slug, slug: r.slug, count: 0, fromRegistry: true });
+  }
+  // 再用文章计数叠加；文章里有但注册表没有的（历史脏数据）用文章名兜底
+  for (const [slug, n] of counts) {
+    if (!map.has(slug)) {
+      const sample = posts.find((x) => (x.categorySlug || 'uncategorized') === slug);
+      map.set(slug, {
+        name: sample?.category || slug,
+        slug,
+        count: 0,
+        fromRegistry: false,
+      });
+    }
+    map.get(slug).count += n;
+  }
+
+  return [...map.values()].sort(
+    (a, b) => (b.count - a.count) || String(a.name).localeCompare(String(b.name))
+  );
 }
 
 export async function getPostsByCategory(slug, lang = 'zh') {

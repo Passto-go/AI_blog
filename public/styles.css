@@ -477,8 +477,8 @@ a { color: inherit; }
 .wb-item { display: flex; align-items: flex-start; gap: 6px; padding: 9px 6px; border-radius: 8px; border-bottom: 1px solid var(--border); }
 .wb-item:last-child { border-bottom: none; }
 .wb-item.on { background: var(--accent-soft); }
-.wb-item-main { flex: 1; min-width: 0; border: none; background: none; cursor: pointer; text-align: left; font: inherit; padding: 0; }
-.wb-item-title { display: block; font-size: 13.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-item-main { flex: 1; min-width: 0; padding: 0; }
+.wb-item-title { display: block; font-size: 13.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
 .wb-item:hover .wb-item-title { color: var(--accent); }
 .wb-item-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
 .wb-badge { font-size: 11px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; }
@@ -487,7 +487,10 @@ a { color: inherit; }
 [data-theme="dark"] .wb-badge.is-live { color: #3fb950; border-color: #1f4f2b; background: #12261a; }
 [data-theme="dark"] .wb-badge.is-draft { color: #d29922; border-color: #4d3d17; background: #241d0f; }
 .wb-date { font-size: 11px; color: var(--muted); }
-.wb-item-del { border: none; background: none; cursor: pointer; font: inherit; font-size: 11.5px; color: var(--muted); padding: 2px 4px; }
+/* 右侧操作区：编辑在上、删除在下 */
+.wb-item-acts { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.wb-item-edit, .wb-item-del { border: none; background: none; cursor: pointer; font: inherit; font-size: 11.5px; color: var(--muted); padding: 2px 4px; border-radius: 6px; line-height: 1.5; }
+.wb-item-edit:hover { color: var(--accent); }
 .wb-item-del:hover { color: #cf222e; }
 [data-theme="dark"] .wb-item-del:hover { color: #f85149; }
 
@@ -1010,3 +1013,17 @@ a { color: inherit; }
 [data-theme="dark"] .wb-cat-rename-msg { color: #f85149; }
 .wb-cat-cancel { background: transparent; color: var(--muted); }
 .wb-cat-cancel:hover { color: var(--text); border-color: var(--text); }
+
+/* 新建分类（编辑器内联 + 分类管理） */
+.wb-cat-new { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.wb-cat-new[hidden] { display: none; }
+.wb-cat-new-label { font-size: 12.5px; color: var(--muted); }
+.wb-cat-new-hint { flex-basis: 100%; margin: 0; font-size: 11.5px; }
+.wb-cat-new .wb-cat { flex: 1; min-width: 150px; }
+.wb-cat-add {
+  margin: 0 0 12px; font: inherit; font-size: 13px; cursor: pointer;
+  padding: 6px 14px; border-radius: 8px; background: var(--accent-soft);
+  color: var(--accent); border: 1px solid var(--accent);
+}
+.wb-cat-add:hover { background: var(--accent); color: #fff; }
+.wb-cat-new--manage { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
