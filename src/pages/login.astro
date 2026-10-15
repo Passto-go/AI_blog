@@ -81,7 +81,7 @@ import Base from '../layouts/Base.astro';
             <details class="wb-more">
               <summary>更多设置（Slug / 摘要 / 封面）</summary>
               <div class="wb-more-body">
-                <label>Slug<input id="f-slug" placeholder="留空自动生成" /></label>
+                <label>Slug<input id="f-slug" placeholder="留空自动生成" /><small id="slug-hint" class="wb-hint"></small></label>
                 <label>摘要<input id="f-excerpt" placeholder="一句话摘要" /></label>
                 <label>封面 URL<input id="f-cover" placeholder="https://…" /></label>
                 <label>分类 Slug<input id="f-catslug" placeholder="留空自动生成" /></label>
@@ -134,7 +134,7 @@ import Base from '../layouts/Base.astro';
   let supabase = null;
 
   // 当前编辑态
-  const state = { id: '', lang: 'zh', status: 'draft', filter: 'all', query: '' };
+  const state = { id: '', lang: 'zh', status: 'draft', filter: 'all', query: '', saving: false };
 
   const LANGS = { zh: '中文', en: 'EN', ja: '日本語' };
 
@@ -181,6 +181,7 @@ import Base from '../layouts/Base.astro';
     $('delete-btn').hidden = !p.id;
     setMsg('');
     renderPreview();
+    updateSlugHint();
     saveLocalDraft();
   }
 
@@ -193,7 +194,7 @@ import Base from '../layouts/Base.astro';
     const category = $('f-category').value.trim();
     return {
       title,
-      slug: $('f-slug').value.trim() || slugify(title) || 'post-' + Date.now(),
+      slug: $('f-slug').value.trim() || autoSlug(title, state.lang),
       lang: state.lang,
       category,
       category_slug: $('f-catslug').value.trim() || slugify(category) || 'uncategorized',
@@ -204,19 +205,101 @@ import Base from '../layouts/Base.astro';
     };
   }
 
+  // 自动生成 Slug。按站点约定：中文用基础名，英/日文加 -en / -ja 后缀，
+  // 这样同一篇文章的各语言版本不会因 slug 相同而撞唯一约束。
+  function autoSlug(title, lang) {
+    const base = slugify(title) || 'post-' + Date.now();
+    const suffix = lang === 'en' ? '-en' : lang === 'ja' ? '-ja' : '';
+    return base + suffix;
+  }
+
+  // 实时提示最终会使用的 Slug
+  function updateSlugHint() {
+    const el = $('slug-hint');
+    if (!el) return;
+    const manual = $('f-slug').value.trim();
+    el.textContent = manual
+      ? '将使用：' + manual
+      : '留空则自动生成：' + autoSlug($('f-title').value || '（标题）', state.lang);
+  }
+
+  // 保存期间禁用按钮，防止快速连点导致两次 INSERT 同一 slug
+  function setButtonsBusy(busy) {
+    ['save-draft-btn', 'publish-btn', 'delete-btn', 'new-btn'].forEach((id) => {
+      const b = $(id);
+      if (!b) return;
+      b.disabled = busy;
+      b.style.opacity = busy ? '.55' : '';
+      b.style.pointerEvents = busy ? 'none' : '';
+    });
+  }
+
+  // 解析出可用的 Slug。
+  // - 自动生成的：撞车就静默加 -2 / -3 … 直到可用
+  // - 用户手填的：撞车就报错让用户自己改（不擅自改动用户输入）
+  async function resolveSlug(base, excludeId, manual) {
+    let candidate = base;
+    for (let i = 0; i < 50; i++) {
+      let q = supabase.from('posts').select('id').eq('slug', candidate).limit(1);
+      if (excludeId) q = q.neq('id', excludeId);
+      const { data, error } = await q;
+      if (error) return { slug: candidate, conflict: false, changed: false };
+      if (!data || data.length === 0) {
+        return { slug: candidate, conflict: false, changed: candidate !== base };
+      }
+      if (manual) return { slug: candidate, conflict: true, changed: false };
+      candidate = `${base}-${i + 2}`;
+    }
+    return { slug: candidate, conflict: false, changed: true };
+  }
+
   // ---------- 保存 ----------
   async function persist() {
     const row = collectRow();
     if (!row.title) { setMsg('请先填写标题', 'err'); $('f-title').focus(); return null; }
+
+    // 防重复提交：快速连点「发布」会出现两次 INSERT 同一 slug，后一次必撞唯一约束
+    if (state.saving) return null;
+    state.saving = true;
+    setButtonsBusy(true);
+
     let error;
-    if (state.id) {
-      ({ error } = await supabase.from('posts').update(row).eq('id', state.id));
-    } else {
-      const r = await supabase.from('posts').insert({ ...row, published_at: new Date().toISOString() });
-      error = r.error;
-      if (!error && r.data?.[0]) state.id = r.data[0].id;
+    try {
+      // Slug 唯一性预处理（posts_slug_key 是全局唯一，不按语言区分）
+      const manual = $('f-slug').value.trim() !== '';
+      const resolved = await resolveSlug(row.slug, state.id || null, manual);
+      if (resolved.conflict) {
+        setMsg(`Slug「${resolved.slug}」已被其他文章占用，请到「更多设置」换一个`, 'err');
+        $('f-slug').focus();
+        return null;
+      }
+      row.slug = resolved.slug;
+      if (resolved.changed) {
+        setMsg(`Slug 已自动改为可用的：${resolved.slug}`);
+        updateSlugHint();
+      }
+
+      if (state.id) {
+        ({ error } = await supabase.from('posts').update(row).eq('id', state.id));
+      } else {
+        const r = await supabase.from('posts').insert({ ...row, published_at: new Date().toISOString() });
+        error = r.error;
+        if (!error && r.data?.[0]) state.id = r.data[0].id;
+      }
+    } finally {
+      state.saving = false;
+      setButtonsBusy(false);
     }
-    if (error) { setMsg('保存失败：' + error.message, 'err'); return null; }
+
+    if (error) {
+      // 兜底：万一预处理之后仍撞约束（并发等），给出可操作的提示
+      if (/duplicate key|posts_slug_key|unique/i.test(error.message)) {
+        setMsg(`保存失败：Slug「${row.slug}」已存在。请打开「更多设置」修改 Slug 后重试`, 'err');
+      } else {
+        setMsg('保存失败：' + error.message, 'err');
+      }
+      return null;
+    }
     $('delete-btn').hidden = !state.id;
     return row;
   }
@@ -441,7 +524,7 @@ import Base from '../layouts/Base.astro';
 
     // 分段控件：语言 / 状态
     $('f-lang').querySelectorAll('button').forEach((b) => b.onclick = () => {
-      state.lang = b.dataset.v; syncSeg($('f-lang'), state.lang); saveLocalDraft();
+      state.lang = b.dataset.v; syncSeg($('f-lang'), state.lang); updateSlugHint(); saveLocalDraft();
     });
     $('f-status').querySelectorAll('button').forEach((b) => b.onclick = () => {
       state.status = b.dataset.v; syncSeg($('f-status'), state.status);
@@ -465,7 +548,10 @@ import Base from '../layouts/Base.astro';
     // 正文输入：预览 + 自动保存
     $('f-content').addEventListener('input', () => { renderPreview(); saveLocalDraft(); });
     ['f-title', 'f-category', 'f-excerpt', 'f-cover', 'f-slug', 'f-catslug'].forEach((id) => {
-      $(id).addEventListener('input', saveLocalDraft);
+      $(id).addEventListener('input', () => {
+        if (id === 'f-title') updateSlugHint();
+        saveLocalDraft();
+      });
     });
 
     // 图片上传
