@@ -549,9 +549,9 @@ a { color: inherit; }
   padding: 5px 10px; width: 108px; max-width: 100%;
 }
 .wb-author-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-/* 右侧操作区：编辑在上、删除在下 */
-.wb-item-acts { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
-.wb-item-edit, .wb-item-del { border: none; background: none; cursor: pointer; font: inherit; font-size: 11.5px; color: var(--muted); padding: 2px 4px; border-radius: 6px; line-height: 1.5; }
+/* 右侧操作区：编辑、删除始终同行排列（任何屏宽都不换行/不堆叠） */
+.wb-item-acts { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 6px; flex-shrink: 0; }
+.wb-item-edit, .wb-item-del { border: none; background: none; cursor: pointer; font: inherit; font-size: 11.5px; color: var(--muted); padding: 2px 4px; border-radius: 6px; line-height: 1.5; white-space: nowrap; flex-shrink: 0; }
 .wb-item-edit:hover { color: var(--accent); }
 .wb-item-del:hover { color: #cf222e; }
 [data-theme="dark"] .wb-item-del:hover { color: #f85149; }
