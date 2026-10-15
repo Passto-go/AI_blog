@@ -80,6 +80,14 @@ export const prerender = true;
               <span id="upload-msg" class="wb-hint"></span>
             </div>
 
+            <div class="wb-trbar">
+              <span class="wb-trbar-label">一键翻译</span>
+              <button id="tr-en-btn" class="wb-tr-btn" type="button" title="把当前文章译成英文并填入编辑器，检查后发布即创建/更新英文版">译成英文</button>
+              <button id="tr-ja-btn" class="wb-tr-btn" type="button" title="把当前文章译成日文并填入编辑器，检查后发布即创建/更新日文版">译成日文</button>
+              <span id="lang-state" class="wb-langstate"></span>
+              <span id="tr-msg" class="wb-hint"></span>
+            </div>
+
             <details class="wb-more">
               <summary>更多设置（Slug / 摘要 / 封面）</summary>
               <div class="wb-more-body">
@@ -361,6 +369,117 @@ export const prerender = true;
     await loadComments();
   }
 
+  // ---------- 一键翻译（经 /api/translate 服务端中转调 LLM） ----------
+  // 约定：中文原文用 base slug，英/日译文用 base-en / base-ja 后缀（posts.slug 全局唯一）。
+  function baseSlug(slug) {
+    return String(slug || '').replace(/-(en|ja)$/, '');
+  }
+
+  function setTrMsg(text, kind = '') {
+    const el = $('tr-msg');
+    el.textContent = text;
+    el.dataset.kind = kind;
+  }
+
+  // 译文状态行：显示当前文章的英/日版本是否已存在（按 base slug 匹配内存全量表），
+  // 已存在的可点击直接载入该版本。
+  function updateLangState() {
+    const el = $('lang-state');
+    if (!el) return;
+    const cur = state.id ? allPosts.find((p) => p.id === state.id) : null;
+    const rawSlug = cur?.slug || $('f-slug').value.trim();
+    if (!rawSlug) { el.innerHTML = ''; return; }
+    const base = baseSlug(rawSlug);
+    const parts = [];
+    for (const code of ['en', 'ja']) {
+      const row = allPosts.find(
+        (p) => p.id !== state.id && baseSlug(p.slug) === base && (p.lang || 'zh') === code
+      );
+      parts.push(
+        row
+          ? `<button type="button" class="wb-langstate-btn has" data-lang="${code}" title="载入${LANGS[code]}版（点击）">${LANGS[code]} ✓</button>`
+          : `<span class="wb-langstate-btn">${LANGS[code]} —</span>`
+      );
+    }
+    el.innerHTML = parts.join('');
+    el.querySelectorAll('button[data-lang]').forEach((b) => {
+      b.onclick = () => {
+        const row = allPosts.find(
+          (p) => baseSlug(p.slug) === base && (p.lang || 'zh') === b.dataset.lang
+        );
+        if (row) { setForm(row); setMsg(`已载入《${row.title}》`); }
+      };
+    });
+  }
+
+  async function translateTo(targetLang) {
+    const title = $('f-title').value.trim();
+    const excerpt = $('f-excerpt').value.trim();
+    const content = $('f-content').value;
+    if (!title || !content.trim()) { setTrMsg('请先填写标题和正文', 'err'); return; }
+    if (content.length > 20000) { setTrMsg('正文超过 2 万字，请拆成多篇再译', 'err'); return; }
+
+    // 是否已有该语言的译文行：有 → 载入其框架后覆盖内容（更新）；无 → 以当前文章为蓝本新建
+    const cur = state.id ? allPosts.find((p) => p.id === state.id) : null;
+    const base = baseSlug(cur?.slug || $('f-slug').value || slugify(title));
+    const existing = allPosts.find(
+      (p) => p.id !== state.id && baseSlug(p.slug) === base && (p.lang || 'zh') === targetLang
+    );
+    const langName = targetLang === 'en' ? '英文' : '日文';
+
+    if (!confirm(
+      existing
+        ? `已存在${langName}版文章。将载入该版本框架，用新译文覆盖其内容，发布后更新线上文章。继续？`
+        : `将把当前文章译成${langName}并填入编辑器（不会自动保存）。发布时会创建新的${langName}版文章。继续？`
+    )) return;
+
+    const btns = [$('tr-en-btn'), $('tr-ja-btn')];
+    btns.forEach((b) => { b.disabled = true; b.style.opacity = '.55'; b.style.pointerEvents = 'none'; });
+    setTrMsg(`正在翻译成${langName}，约需 10–40 秒…`, '');
+    try {
+      const { data: sd } = await supabase.auth.getSession();
+      const token = sd?.session?.access_token;
+      if (!token) { setTrMsg('会话已过期，请重新登录后再试', 'err'); return; }
+
+      const resp = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title, excerpt, content, targetLang }),
+      });
+      const result = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        setTrMsg(result.error || `翻译失败（HTTP ${resp.status}）`, 'err');
+        return;
+      }
+
+      if (existing) {
+        setForm(existing); // 保留英文版自己的分类/封面/发布状态，只覆盖三项内容
+      } else {
+        // 切到新建态：发布时 INSERT 译文行，不会覆盖中文原文
+        state.id = '';
+        state.lang = targetLang;
+        syncSeg($('f-lang'), targetLang);
+        const slugNow = $('f-slug').value.trim();
+        if (!slugNow || slugNow === base) $('f-slug').value = `${base}-${targetLang}`;
+        $('delete-btn').hidden = true;
+      }
+      $('f-title').value = result.title;
+      $('f-excerpt').value = result.excerpt || '';
+      $('f-content').value = result.content;
+      renderPreview();
+      updateSlugHint();
+      saveLocalDraft();
+      setTrMsg(
+        `✓ 译文已填入${result.parts > 1 ? `（长文分 ${result.parts} 段翻译，请重点检查段落衔接）` : ''}。请通读检查后点击「发布」`,
+        'ok'
+      );
+    } catch (e) {
+      setTrMsg('网络错误：' + (e?.message || '请求失败'), 'err');
+    } finally {
+      btns.forEach((b) => { b.disabled = false; b.style.opacity = ''; b.style.pointerEvents = ''; });
+    }
+  }
+
   // ---------- 表单 ----------
   function setForm(p = {}) {
     state.id = p.id || '';
@@ -379,6 +498,7 @@ export const prerender = true;
     setMsg('');
     renderPreview();
     updateSlugHint();
+    updateLangState();
     saveLocalDraft();
   }
 
@@ -585,6 +705,7 @@ export const prerender = true;
     allPosts = data || [];
     renderCategories();
     renderList();
+    updateLangState();
   }
 
   function renderCategories() {
@@ -692,6 +813,10 @@ export const prerender = true;
     $('publish-btn').onclick = publish;
     $('new-btn').onclick = () => { setForm({}); setMsg(''); };
     $('cd-save').onclick = saveCountdown;
+
+    // 一键翻译
+    $('tr-en-btn').onclick = () => translateTo('en');
+    $('tr-ja-btn').onclick = () => translateTo('ja');
 
     // 评论管理：状态筛选
     $('cm-filter').querySelectorAll('button').forEach((b) => b.onclick = () => {

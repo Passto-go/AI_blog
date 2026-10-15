@@ -426,6 +426,32 @@ a { color: inherit; }
 [data-theme="dark"] #save-msg[data-kind="ok"] { color: #3fb950; }
 [data-theme="dark"] #save-msg[data-kind="err"] { color: #f85149; }
 
+/* ---------- 写作后台：一键翻译（LLM） ---------- */
+.wb-trbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 10px 0 6px; padding: 10px 12px;
+  background: var(--surface-2); border: 1px dashed var(--border); border-radius: var(--radius);
+}
+.wb-trbar-label { font-size: 12.5px; color: var(--muted); }
+.wb-tr-btn {
+  font-size: 13px; padding: 6px 14px;
+  border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent);
+  border-radius: 999px; cursor: pointer; font-weight: 600;
+}
+.wb-tr-btn:hover:not(:disabled) { background: var(--accent); color: #fff; }
+.wb-tr-btn:disabled { cursor: wait; }
+.wb-langstate { display: inline-flex; gap: 6px; margin-left: auto; }
+.wb-langstate-btn {
+  font-size: 12px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+}
+.wb-langstate-btn.has { color: var(--accent); border-color: var(--accent); cursor: pointer; }
+.wb-langstate-btn.has:hover { background: var(--accent-soft); }
+#tr-msg[data-kind="ok"] { color: #1a7f37; }
+#tr-msg[data-kind="err"] { color: #cf222e; }
+[data-theme="dark"] #tr-msg[data-kind="ok"] { color: #3fb950; }
+[data-theme="dark"] #tr-msg[data-kind="err"] { color: #f85149; }
+
 /* 列表列 */
 .wb-side-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
 .wb-side-head strong { font-size: 15px; color: var(--text-strong); }
