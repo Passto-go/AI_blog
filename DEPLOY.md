@@ -54,7 +54,7 @@
 ### `wrangler.toml` 已带，无需手动配
 
 ```toml
-name = "styleblog-v2-0"          # 必须与 Dashboard 项目名完全一致
+name = "mystyle"                 # 必须与 Dashboard 项目名完全一致
 main = "dist/_worker.js/index.js"
 compatibility_date = "2025-07-18"
 compatibility_flags = ["nodejs_compat"]
