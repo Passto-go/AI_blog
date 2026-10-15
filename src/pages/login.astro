@@ -3,167 +3,404 @@ import Base from '../layouts/Base.astro';
 ---
 
 <Base lang="zh" title="写作后台" description="登录后在线撰写与发布文章">
-  <div class="admin">
-    <h1>写作后台</h1>
+  <div class="wb">
 
-    <div id="cfg-note" class="admin-note" style="display:none">
-      未检测到 Supabase 配置。请在仓库根目录的 <code>.env</code> 填入
-      <code>PUBLIC_SUPABASE_URL</code> 与 <code>PUBLIC_SUPABASE_ANON_KEY</code> 后重新部署。
-    </div>
+    <!-- ============ 未登录 ============ -->
+    <section id="login-view" class="wb-login" hidden>
+      <form id="login-form" class="wb-login-card">
+        <h1>写作后台</h1>
+        <p class="wb-sub">登录后即可撰写、发布文章</p>
 
-    <!-- 登录 -->
-    <section id="login-box">
-      <h2>登录</h2>
-      <p class="admin-note">使用你注册的 Supabase 邮箱 / 密码登录。国内访问 Supabase 若不畅，请改用代理或海外网络。</p>
-      <form id="login-form" class="admin-form">
-        <div>
-          <label for="email">邮箱</label>
-          <input id="email" type="email" autocomplete="username" placeholder="you@example.com" required />
+        <div id="cfg-note" class="wb-alert" hidden>
+          未检测到 Supabase 配置。请在 Netlify 环境变量中填入
+          <code>PUBLIC_SUPABASE_URL</code> 与 <code>PUBLIC_SUPABASE_ANON_KEY</code> 后重新部署。
         </div>
-        <div>
-          <label for="password">密码</label>
-          <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
-        </div>
-        <div>
-          <button class="btn-accent" type="submit">登录</button>
-          <span id="login-msg" style="color:var(--muted);font-size:14px;margin-left:10px"></span>
-        </div>
+
+        <label for="email">邮箱</label>
+        <input id="email" type="email" autocomplete="username" placeholder="you@example.com" required />
+        <label for="password">密码</label>
+        <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+
+        <button class="btn" type="submit">登录</button>
+        <span id="login-msg" class="wb-hint"></span>
       </form>
     </section>
 
-    <!-- 编辑器 -->
-    <section id="editor-box" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-        <h2 style="margin:0">撰写文章</h2>
-        <button class="btn-ghost" id="logout-btn" type="button">退出登录</button>
+    <!-- ============ 工作台 ============ -->
+    <section id="workbench" class="wb-bench" hidden>
+      <header class="wb-top">
+        <div class="wb-top-left">
+          <strong>写作后台</strong>
+          <span id="wb-user" class="wb-user"></span>
+        </div>
+        <div class="wb-top-right">
+          <button id="rebuild-btn" class="btn btn-ghost" type="button" title="重新构建站点，让已发布内容上线">↻ 上线到网站</button>
+          <button id="logout-btn" class="btn btn-ghost" type="button">退出</button>
+        </div>
+      </header>
+
+      <div class="wb-grid">
+        <!-- ---------- 编辑列 ---------- -->
+        <div class="wb-main">
+          <div class="wb-card">
+            <input id="f-title" class="wb-title" placeholder="文章标题" />
+
+            <div class="wb-meta">
+              <div class="wb-seg" id="f-lang" role="group" aria-label="语言">
+                <button type="button" data-v="zh" class="on">中文</button>
+                <button type="button" data-v="en">EN</button>
+                <button type="button" data-v="ja">日本語</button>
+              </div>
+              <input id="f-category" class="wb-cat" list="cat-list" placeholder="分类（可选）" />
+              <datalist id="cat-list"></datalist>
+              <div class="wb-seg" id="f-status" role="group" aria-label="状态">
+                <button type="button" data-v="draft" class="on">草稿</button>
+                <button type="button" data-v="published">已发布</button>
+              </div>
+            </div>
+
+            <div class="wb-tabs" id="wb-tabs">
+              <button type="button" data-tab="edit" class="on">编辑</button>
+              <button type="button" data-tab="preview">预览</button>
+              <button type="button" data-tab="split">分屏</button>
+            </div>
+
+            <div class="wb-editor" id="wb-editor" data-tab="edit">
+              <textarea id="f-content" placeholder="用 Markdown 写作…&#10;&#10;# 二级标题&#10;正文、**加粗**、`代码`、![图片](https://…)"></textarea>
+              <div id="preview" class="wb-preview content"></div>
+            </div>
+
+            <div class="wb-toolbar">
+              <label class="wb-upload" title="上传图片到 Supabase 存储并插入正文">
+                插图
+                <input id="f-image" type="file" accept="image/*" multiple hidden />
+              </label>
+              <span id="upload-msg" class="wb-hint"></span>
+            </div>
+
+            <details class="wb-more">
+              <summary>更多设置（Slug / 摘要 / 封面）</summary>
+              <div class="wb-more-body">
+                <label>Slug<input id="f-slug" placeholder="留空自动生成" /></label>
+                <label>摘要<input id="f-excerpt" placeholder="一句话摘要" /></label>
+                <label>封面 URL<input id="f-cover" placeholder="https://…" /></label>
+                <label>分类 Slug<input id="f-catslug" placeholder="留空自动生成" /></label>
+              </div>
+            </details>
+
+            <div class="wb-actions">
+              <button id="save-draft-btn" class="btn btn-ghost" type="button">存草稿</button>
+              <button id="publish-btn" class="btn" type="button">发布并上线</button>
+              <button id="new-btn" class="btn btn-ghost" type="button">新建</button>
+              <button id="delete-btn" class="btn btn-danger" type="button" hidden>删除</button>
+              <span id="save-msg" class="wb-hint"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ---------- 列表列 ---------- -->
+        <aside class="wb-side">
+          <div class="wb-card">
+            <div class="wb-side-head">
+              <strong>文章</strong>
+              <span id="wb-count" class="wb-hint"></span>
+            </div>
+            <input id="wb-search" class="wb-search" type="search" placeholder="搜索标题…" />
+            <div class="wb-filter" id="wb-filter">
+              <button type="button" data-f="all" class="on">全部</button>
+              <button type="button" data-f="published">已发布</button>
+              <button type="button" data-f="draft">草稿</button>
+            </div>
+            <ul id="post-list" class="wb-list"></ul>
+          </div>
+        </aside>
       </div>
-      <p class="admin-note">保存即写入 Supabase；纯静态站点需<b>重新构建 / 部署</b>（Netlify 重新触发 Build）后，读者端才会更新。</p>
-
-      <form id="post-form" class="admin-form">
-        <input type="hidden" id="post-id" />
-        <div class="admin-row">
-          <div>
-            <label for="f-title">标题</label>
-            <input id="f-title" type="text" placeholder="标题" required />
-          </div>
-          <div>
-            <label for="f-slug">Slug（URL 片段，留空自动生成）</label>
-            <input id="f-slug" type="text" placeholder="my-post" />
-          </div>
-        </div>
-        <div class="admin-row">
-          <div>
-            <label for="f-lang">语言</label>
-            <select id="f-lang">
-              <option value="zh">中文</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-          <div>
-            <label for="f-category">分类名</label>
-            <input id="f-category" type="text" placeholder="随笔 / Essays" />
-          </div>
-          <div>
-            <label for="f-catslug">分类 Slug（留空自动生成）</label>
-            <input id="f-catslug" type="text" placeholder="essays" />
-          </div>
-        </div>
-        <div>
-          <label for="f-excerpt">摘要</label>
-          <input id="f-excerpt" type="text" placeholder="一句话摘要（列表页显示）" />
-        </div>
-        <div>
-          <label for="f-cover">封面图 URL（可选）</label>
-          <input id="f-cover" type="text" placeholder="https://..." />
-        </div>
-        <div>
-          <label for="f-content">正文（Markdown）</label>
-          <textarea id="f-content" placeholder="# 标题&#10;&#10;正文内容，支持 Markdown…"></textarea>
-        </div>
-        <div style="display:flex;align-items:center;gap:14px">
-          <label style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--text)">
-            <input id="f-published" type="checkbox" checked /> 已发布
-          </label>
-          <button class="btn-accent" type="submit">保存</button>
-          <button class="btn-ghost" type="button" id="reset-btn">新建 / 清空</button>
-          <span id="save-msg" style="color:var(--muted);font-size:14px"></span>
-        </div>
-      </form>
-
-      <h2 style="margin-top:28px">已有文章</h2>
-      <ul class="admin-list" id="post-list"></ul>
     </section>
   </div>
 </Base>
 
 <script>
   import { createClient } from '@supabase/supabase-js';
+  import { marked } from 'marked';
 
   const URL = import.meta.env.PUBLIC_SUPABASE_URL;
   const KEY = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+  const HOOK = import.meta.env.PUBLIC_BUILD_HOOK || '';
+  const DRAFT_KEY = 'wb-local-draft';
   const $ = (id) => document.getElementById(id);
 
+  // 当前编辑态
+  const state = { id: '', lang: 'zh', status: 'draft', filter: 'all', query: '' };
+
+  const LANGS = { zh: '中文', en: 'EN', ja: '日本語' };
+
+  function slugify(str) {
+    return String(str).trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-\u4e00-\u9fa5]/g, '');
+  }
+
+  function setMsg(text, kind = '') {
+    const el = $('save-msg');
+    el.textContent = text;
+    el.dataset.kind = kind;
+  }
+
+  // ---------- 视图切换 ----------
+  function showLogin(msg) {
+    $('login-view').hidden = false;
+    $('workbench').hidden = true;
+    if (msg) $('login-msg').textContent = msg;
+  }
+
+  async function showWorkbench() {
+    $('login-view').hidden = true;
+    $('workbench').hidden = false;
+    const { data } = await supabase.auth.getUser();
+    $('wb-user').textContent = data?.user?.email || '';
+    $('rebuild-btn').style.display = HOOK ? '' : 'none';
+    await loadList();
+  }
+
+  // ---------- 表单 ----------
+  function setForm(p = {}) {
+    state.id = p.id || '';
+    $('f-title').value = p.title || '';
+    $('f-slug').value = p.slug || '';
+    $('f-category').value = p.category || '';
+    $('f-catslug').value = p.category_slug || '';
+    $('f-excerpt').value = p.excerpt || '';
+    $('f-cover').value = p.cover || '';
+    $('f-content').value = p.content || '';
+    state.lang = p.lang || 'zh';
+    state.status = p.published === false ? 'draft' : (p.id ? 'published' : 'draft');
+    syncSeg($('f-lang'), state.lang);
+    syncSeg($('f-status'), state.status);
+    $('delete-btn').hidden = !p.id;
+    setMsg('');
+    renderPreview();
+    saveLocalDraft();
+  }
+
+  function syncSeg(container, value) {
+    container.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === value));
+  }
+
+  function collectRow() {
+    const title = $('f-title').value.trim();
+    const category = $('f-category').value.trim();
+    return {
+      title,
+      slug: $('f-slug').value.trim() || slugify(title) || 'post-' + Date.now(),
+      lang: state.lang,
+      category,
+      category_slug: $('f-catslug').value.trim() || slugify(category) || 'uncategorized',
+      excerpt: $('f-excerpt').value.trim(),
+      cover: $('f-cover').value.trim(),
+      content: $('f-content').value,
+      published: state.status === 'published',
+    };
+  }
+
+  // ---------- 保存 ----------
+  async function persist() {
+    const row = collectRow();
+    if (!row.title) { setMsg('请先填写标题', 'err'); $('f-title').focus(); return null; }
+    let error;
+    if (state.id) {
+      ({ error } = await supabase.from('posts').update(row).eq('id', state.id));
+    } else {
+      const r = await supabase.from('posts').insert({ ...row, published_at: new Date().toISOString() });
+      error = r.error;
+      if (!error && r.data?.[0]) state.id = r.data[0].id;
+    }
+    if (error) { setMsg('保存失败：' + error.message, 'err'); return null; }
+    $('delete-btn').hidden = !state.id;
+    return row;
+  }
+
+  async function saveDraft() {
+    state.status = 'draft';
+    syncSeg($('f-status'), 'draft');
+    const row = await persist();
+    if (!row) return;
+    setMsg('草稿已保存', 'ok');
+    clearLocalDraft();
+    await loadList();
+  }
+
+  async function publish() {
+    state.status = 'published';
+    syncSeg($('f-status'), 'published');
+    const row = await persist();
+    if (!row) return;
+    if (HOOK) {
+      setMsg('已保存，正在触发上线…');
+      await triggerBuild();
+    } else {
+      setMsg('已发布 ✓ 未配置构建钩子，请手动到 Netlify 重新部署', 'ok');
+    }
+    clearLocalDraft();
+    await loadList();
+  }
+
+  // ---------- 一键上线（Netlify Build Hook） ----------
+  async function triggerBuild() {
+    if (!HOOK) { setMsg('未配置构建钩子（PUBLIC_BUILD_HOOK），无法一键上线', 'err'); return; }
+    setMsg('正在触发上线…');
+    try {
+      const r = await fetch(HOOK, { method: 'POST' });
+      setMsg(r.ok ? '已触发上线 ✓ 约 1 分钟后全站生效' : '上线失败：HTTP ' + r.status, r.ok ? 'ok' : 'err');
+    } catch (e) {
+      setMsg('上线失败：' + e.message, 'err');
+    }
+  }
+
+  // ---------- 文章列表 ----------
+  let allPosts = [];
+
+  function renderList() {
+    const ul = $('post-list');
+    ul.innerHTML = '';
+    const q = state.query.trim().toLowerCase();
+    const rows = allPosts.filter((p) => {
+      const okFilter = state.filter === 'all'
+        || (state.filter === 'published' ? p.published : !p.published);
+      const okQuery = !q || (p.title || '').toLowerCase().includes(q);
+      return okFilter && okQuery;
+    });
+
+    $('wb-count').textContent = `${rows.length} / ${allPosts.length}`;
+
+    if (!rows.length) {
+      ul.innerHTML = '<li class="wb-empty">没有匹配的文章</li>';
+      return;
+    }
+
+    rows.forEach((p) => {
+      const li = document.createElement('li');
+      li.className = 'wb-item' + (p.id === state.id ? ' on' : '');
+
+      const main = document.createElement('button');
+      main.type = 'button';
+      main.className = 'wb-item-main';
+      const d = p.published_at ? new Date(p.published_at).toLocaleDateString('zh-CN') : '';
+      main.innerHTML =
+        `<span class="wb-item-title">${escapeHtml(p.title || '(无标题)')}</span>
+         <span class="wb-item-meta">
+           <span class="wb-badge">${LANGS[p.lang] || p.lang || 'zh'}</span>
+           <span class="wb-badge ${p.published ? 'is-live' : 'is-draft'}">${p.published ? '已发布' : '草稿'}</span>
+           <span class="wb-date">${d}</span>
+         </span>`;
+      main.onclick = () => { setForm(p); setMsg('已载入《' + p.title + '》'); };
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'wb-item-del';
+      del.textContent = '删除';
+      del.title = '删除这篇文章';
+      del.onclick = async () => {
+        if (!confirm('确定删除《' + (p.title || '无标题') + '》？此操作不可恢复。')) return;
+        const { error } = await supabase.from('posts').delete().eq('id', p.id);
+        if (error) { alert('删除失败：' + error.message); return; }
+        if (state.id === p.id) setForm({});
+        await loadList();
+      };
+
+      li.append(main, del);
+      ul.append(li);
+    });
+  }
+
+  async function loadList() {
+    const { data, error } = await supabase
+      .from('posts').select('*').order('published_at', { ascending: false });
+    if (error) { $('post-list').innerHTML = '<li class="wb-empty">读取失败：' + error.message + '</li>'; return; }
+    allPosts = data || [];
+    renderCategories();
+    renderList();
+  }
+
+  function renderCategories() {
+    const names = [...new Set(allPosts.map((p) => p.category).filter(Boolean))].sort();
+    $('cat-list').innerHTML = names.map((n) => `<option value="${escapeHtml(n)}"></option>`).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // ---------- Markdown 预览 ----------
+  let previewTimer;
+  function renderPreview() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => {
+      $('preview').innerHTML = marked.parse($('f-content').value || '') || '<p class="wb-hint">暂无内容</p>';
+    }, 120);
+  }
+
+  // ---------- 本地自动保存 ----------
+  let autosaveTimer;
+  function saveLocalDraft() {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => {
+      const snap = { ...collectRow(), id: state.id };
+      if (!snap.title && !snap.content) return;
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify(snap)); } catch {}
+    }, 700);
+  }
+
+  function clearLocalDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch {} }
+
+  function restoreLocalDraft() {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const snap = JSON.parse(raw);
+      if (snap.id) return; // 只恢复「新建」场景
+      setForm(snap);
+      setMsg('已恢复上次未保存的内容', 'ok');
+    } catch {}
+  }
+
+  // ---------- 图片上传 ----------
+  async function uploadImages(files) {
+    const msg = $('upload-msg');
+    const ok = [];
+    for (const file of files) {
+      msg.textContent = `上传中 ${file.name}…`;
+      const path = `${Date.now()}-${slugify(file.name) || 'image'}`;
+      const { error } = await supabase.storage.from('images').upload(path, file, { upsert: true });
+      if (error) { msg.textContent = '上传失败：' + error.message; return; }
+      ok.push(supabase.storage.from('images').getPublicUrl(path).data.publicUrl);
+    }
+    if (ok.length) {
+      insertAtCursor(ok.map((u) => `![](${u})`).join('\n'));
+      msg.textContent = `已插入 ${ok.length} 张图片 ✓`;
+    }
+  }
+
+  function insertAtCursor(text) {
+    const ta = $('f-content');
+    const start = ta.selectionStart ?? ta.value.length;
+    const end = ta.selectionEnd ?? ta.value.length;
+    const before = ta.value.slice(0, start);
+    const after = ta.value.slice(end);
+    const pad = (before && !before.endsWith('\n') ? '\n' : '') + text + '\n';
+    ta.value = before + pad + after;
+    ta.focus();
+    ta.selectionStart = ta.selectionEnd = before.length + pad.length;
+    renderPreview();
+    saveLocalDraft();
+  }
+
+  // ---------- 未配置 Supabase ----------
   if (!URL || !KEY) {
-    $('cfg-note').style.display = 'block';
-    $('login-box').style.display = 'none';
+    $('cfg-note').hidden = false;
+    $('login-form').querySelector('button').disabled = true;
+    showLogin();
   } else {
     const supabase = createClient(URL, KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 
-    function slugify(str) {
-      return String(str).trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-\u4e00-\u9fa5]/g, '');
-    }
-
-    async function showEditor() {
-      $('login-box').style.display = 'none';
-      $('editor-box').style.display = 'block';
-      await loadList();
-    }
-
-    function showLogin(msg) {
-      $('login-box').style.display = 'block';
-      $('editor-box').style.display = 'none';
-      if (msg) $('login-msg').textContent = msg;
-    }
-
-    function setForm(p) {
-      $('post-id').value = p.id || '';
-      $('f-title').value = p.title || '';
-      $('f-slug').value = p.slug || '';
-      $('f-lang').value = p.lang || 'zh';
-      $('f-category').value = p.category || '';
-      $('f-catslug').value = p.category_slug || '';
-      $('f-excerpt').value = p.excerpt || '';
-      $('f-cover').value = p.cover || '';
-      $('f-content').value = p.content || '';
-      $('f-published').checked = p.published !== false;
-    }
-
-    async function loadList() {
-      const { data, error } = await supabase
-        .from('posts').select('*').order('published_at', { ascending: false });
-      const ul = $('post-list');
-      ul.innerHTML = '';
-      if (error) { ul.innerHTML = '<li>读取失败：' + error.message + '</li>'; return; }
-      (data || []).forEach((p) => {
-        const li = document.createElement('li');
-        const t = document.createElement('div');
-        t.className = 't';
-        t.innerHTML = `<strong>${p.title}</strong> <small>· ${p.lang || 'zh'} · ${p.published ? '已发布' : '草稿'}</small>`;
-        const edit = document.createElement('button');
-        edit.className = 'btn-ghost'; edit.textContent = '编辑';
-        edit.onclick = () => { setForm(p); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-        const del = document.createElement('button');
-        del.className = 'btn-ghost'; del.textContent = '删除';
-        del.onclick = async () => {
-          if (!confirm('确定删除《' + p.title + '》？')) return;
-          const { error } = await supabase.from('posts').delete().eq('id', p.id);
-          if (error) alert('删除失败：' + error.message); else loadList();
-        };
-        li.append(t, edit, del);
-        ul.append(li);
-      });
-    }
-
+    // 登录
     $('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       $('login-msg').textContent = '登录中…';
@@ -172,50 +409,70 @@ import Base from '../layouts/Base.astro';
       });
       if (error) { $('login-msg').textContent = '失败：' + error.message; return; }
       $('login-msg').textContent = '';
-      showEditor();
+      restoreLocalDraft();
+      await showWorkbench();
     });
 
+    // 退出
     $('logout-btn').addEventListener('click', async () => {
       await supabase.auth.signOut();
       showLogin();
     });
 
-    $('reset-btn').addEventListener('click', () => setForm({}));
-
-    $('post-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const id = $('post-id').value;
-      const category = $('f-category').value.trim();
-      const row = {
-        title: $('f-title').value.trim(),
-        slug: ($('f-slug').value.trim() || slugify($('f-title').value)) || ('post-' + Date.now()),
-        lang: $('f-lang').value,
-        category,
-        category_slug: ($('f-catslug').value.trim() || slugify(category) || 'uncategorized'),
-        excerpt: $('f-excerpt').value.trim(),
-        cover: $('f-cover').value.trim(),
-        content: $('f-content').value,
-        published: $('f-published').checked,
-        published_at: new Date().toISOString(),
-      };
-      $('save-msg').textContent = '保存中…';
-      let error;
-      if (id) {
-        const r = await supabase.from('posts').update(row).eq('id', id);
-        error = r.error;
-      } else {
-        const r = await supabase.from('posts').insert(row);
-        error = r.error;
-      }
-      if (error) { $('save-msg').textContent = '失败：' + error.message; return; }
-      $('save-msg').textContent = '已保存 ✓ 请重新构建 / 部署以发布';
+    // 操作按钮
+    $('save-draft-btn').onclick = saveDraft;
+    $('publish-btn').onclick = publish;
+    $('rebuild-btn').onclick = triggerBuild;
+    $('new-btn').onclick = () => { setForm({}); setMsg(''); };
+    $('delete-btn').onclick = async () => {
+      if (!state.id) return;
+      const { data: cur } = await supabase.from('posts').select('title').eq('id', state.id).single();
+      if (!confirm('确定删除《' + (cur?.title || '无标题') + '》？此操作不可恢复。')) return;
+      const { error } = await supabase.from('posts').delete().eq('id', state.id);
+      if (error) { setMsg('删除失败：' + error.message, 'err'); return; }
       setForm({});
-      loadList();
+      setMsg('已删除', 'ok');
+      await loadList();
+    };
+
+    // 分段控件：语言 / 状态
+    $('f-lang').querySelectorAll('button').forEach((b) => b.onclick = () => {
+      state.lang = b.dataset.v; syncSeg($('f-lang'), state.lang); saveLocalDraft();
+    });
+    $('f-status').querySelectorAll('button').forEach((b) => b.onclick = () => {
+      state.status = b.dataset.v; syncSeg($('f-status'), state.status);
     });
 
-    // 进入页面时若已有会话，直接进编辑器
+    // 视图 Tab
+    $('wb-tabs').querySelectorAll('button').forEach((b) => b.onclick = () => {
+      $('wb-tabs').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+      $('wb-editor').dataset.tab = b.dataset.tab;
+      if (b.dataset.tab !== 'edit') renderPreview();
+    });
+
+    // 列表筛选 / 搜索
+    $('wb-filter').querySelectorAll('button').forEach((b) => b.onclick = () => {
+      state.filter = b.dataset.f;
+      $('wb-filter').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+      renderList();
+    });
+    $('wb-search').addEventListener('input', (e) => { state.query = e.target.value; renderList(); });
+
+    // 正文输入：预览 + 自动保存
+    $('f-content').addEventListener('input', () => { renderPreview(); saveLocalDraft(); });
+    ['f-title', 'f-category', 'f-excerpt', 'f-cover', 'f-slug', 'f-catslug'].forEach((id) => {
+      $(id).addEventListener('input', saveLocalDraft);
+    });
+
+    // 图片上传
+    $('f-image').addEventListener('change', (e) => {
+      if (e.target.files?.length) uploadImages([...e.target.files]);
+      e.target.value = '';
+    });
+
+    // 已有会话直接进工作台
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) showEditor();
+      if (data.session) showWorkbench(); else showLogin();
     });
   }
 </script>

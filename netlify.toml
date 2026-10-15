@@ -7,3 +7,6 @@
   # 可选：连接 Supabase 后在此填入，构建时会拉取线上文章；留空则使用内置示例文章
   # PUBLIC_SUPABASE_URL = "https://xxxx.supabase.co"
   # PUBLIC_SUPABASE_ANON_KEY = "eyJ..."
+  # 可选：Netlify 构建钩子，用于写作后台「发布并上线」一键触发重新构建
+  # 获取：Site configuration → Build & deploy → Build hooks → Add build hook（分支 main）
+  # PUBLIC_BUILD_HOOK = "https://api.netlify.com/build_hooks/xxxx"
