@@ -54,7 +54,8 @@ export const prerender = true;
         <div class="wb-grid">
           <!-- ---------- 编辑列 ---------- -->
           <div class="wb-main">
-            <div class="wb-card">
+            <div class="wb-card wb-editor-card">
+              <button id="editor-close" class="wb-editor-close" type="button" title="关闭，返回文章列表" aria-label="关闭">✕</button>
               <input id="f-title" class="wb-title" placeholder="文章标题" />
 
               <div class="wb-meta">
@@ -214,6 +215,19 @@ export const prerender = true;
 
   const LANGS = { zh: '中文', en: 'EN', ja: '日本語' };
 
+  // 编辑器弹窗：文章管理默认只显示列表；点「新建文章」或行内「编辑」时才弹出编辑器
+  // （通过给 #mod-write 加 .editing，把 .wb-main 变成遮罩弹窗，见 styles.css）
+  function openEditor(post) {
+    setForm(post && post.id ? post : (post || {}));
+    $('mod-write').classList.add('editing');
+    document.body.style.overflow = 'hidden';
+    try { $('f-title').focus(); } catch {}
+  }
+  function closeEditor() {
+    $('mod-write').classList.remove('editing');
+    document.body.style.overflow = '';
+  }
+
   function slugify(str) {
     return String(str).trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-\u4e00-\u9fa5]/g, '');
   }
@@ -245,6 +259,7 @@ export const prerender = true;
   const MODULES = ['write', 'comments', 'misc'];
   function switchModule(name) {
     if (!MODULES.includes(name)) return;
+    closeEditor(); // 切换模块时收起编辑器弹窗，避免遮罩/滚动锁残留
     MODULES.forEach((m) => { $('mod-' + m).hidden = m !== name; });
     document.querySelectorAll('#wb-modnav [data-mod]').forEach((b) => {
       b.classList.toggle('on', b.dataset.mod === name);
@@ -1000,7 +1015,7 @@ export const prerender = true;
       edit.className = 'wb-item-edit';
       edit.textContent = '编辑';
       edit.title = '在编辑器中打开修改';
-      edit.onclick = () => { setForm(p); setMsg('已载入《' + (p.title || '无标题') + '》'); };
+      edit.onclick = () => openEditor(p);
 
       const del = document.createElement('button');
       del.type = 'button';
@@ -1146,7 +1161,7 @@ export const prerender = true;
       if (!raw) return;
       const snap = JSON.parse(raw);
       if (snap.id) return; // 只恢复「新建」场景
-      setForm(snap);
+      openEditor(snap);
       setMsg('已恢复上次未保存的内容', 'ok');
     } catch {}
   }
@@ -1217,7 +1232,16 @@ export const prerender = true;
     // 操作按钮
     $('save-draft-btn').onclick = saveDraft;
     $('publish-btn').onclick = publish;
-    $('new-article-btn').onclick = () => { setForm({}); setMsg(''); $('f-title').focus(); };
+    $('new-article-btn').onclick = () => openEditor();
+    $('editor-close').onclick = closeEditor;
+    // 点弹窗遮罩空白处关闭
+    document.querySelector('#mod-write .wb-main').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeEditor();
+    });
+    // Esc 关闭弹窗
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && $('mod-write').classList.contains('editing')) closeEditor();
+    });
     $('cd-save').onclick = saveCountdown;
 
     // 分类管理：新增分类
@@ -1258,6 +1282,7 @@ export const prerender = true;
       setForm({});
       setMsg('已删除', 'ok');
       await loadList();
+      closeEditor();
     };
 
     // 分段控件：语言 / 状态
