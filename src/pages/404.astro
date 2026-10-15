@@ -1,7 +1,12 @@
 ---
 import Base from '../layouts/Base.astro';
+
+// 既作为站点 404 页（Astro 自动渲染，无 props），也被各 SSR 路由 import 作「文章不存在」回退
+const { lang = 'zh' } = Astro.props;
+
+export const prerender = true;
 ---
-<Base lang="zh" title="404">
+<Base lang={lang} title="404">
   <section class="page" style="text-align:center; padding: 80px 0;">
     <h1 class="page-title">404</h1>
     <p class="lead">页面不存在 / Page not found</p>

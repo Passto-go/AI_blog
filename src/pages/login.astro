@@ -1,5 +1,8 @@
 ---
 import Base from '../layouts/Base.astro';
+
+// 纯客户端应用（supabase-js 在浏览器里运行），无需 SSR，预渲染为静态页
+export const prerender = true;
 ---
 
 <Base lang="zh" title="写作后台" description="登录后在线撰写与发布文章">
@@ -34,7 +37,6 @@ import Base from '../layouts/Base.astro';
           <span id="wb-user" class="wb-user"></span>
         </div>
         <div class="wb-top-right">
-          <button id="rebuild-btn" class="btn btn-ghost" type="button" title="重新构建站点，让已发布内容上线">↻ 上线到网站</button>
           <button id="logout-btn" class="btn btn-ghost" type="button">退出</button>
         </div>
       </header>
@@ -125,7 +127,6 @@ import Base from '../layouts/Base.astro';
 
   const URL = import.meta.env.PUBLIC_SUPABASE_URL;
   const KEY = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
-  const HOOK = import.meta.env.PUBLIC_BUILD_HOOK || '';
   const DRAFT_KEY = 'wb-local-draft';
   const $ = (id) => document.getElementById(id);
 
@@ -160,7 +161,6 @@ import Base from '../layouts/Base.astro';
     $('workbench').hidden = false;
     const { data } = await supabase.auth.getUser();
     $('wb-user').textContent = data?.user?.email || '';
-    $('rebuild-btn').style.display = HOOK ? '' : 'none';
     await loadList();
   }
 
@@ -319,26 +319,10 @@ import Base from '../layouts/Base.astro';
     syncSeg($('f-status'), 'published');
     const row = await persist();
     if (!row) return;
-    if (HOOK) {
-      setMsg('已保存，正在触发上线…');
-      await triggerBuild();
-    } else {
-      setMsg('已发布 ✓ 未配置部署钩子，站点将在下次部署后更新', 'ok');
-    }
+    // SSR 模式：写入 Supabase 即对全站生效，读者刷新即可看到，无需触发任何构建
+    setMsg('已发布 ✓ 已即时生效，读者刷新即可看到', 'ok');
     clearLocalDraft();
     await loadList();
-  }
-
-  // ---------- 一键上线（部署钩子 Deploy Hook：Netlify Build Hook / Cloudflare Deploy Hook） ----------
-  async function triggerBuild() {
-    if (!HOOK) { setMsg('未配置部署钩子（PUBLIC_BUILD_HOOK），无法一键上线', 'err'); return; }
-    setMsg('正在触发上线…');
-    try {
-      const r = await fetch(HOOK, { method: 'POST' });
-      setMsg(r.ok ? '已触发上线 ✓ 约 1 分钟后全站生效' : '上线失败：HTTP ' + r.status, r.ok ? 'ok' : 'err');
-    } catch (e) {
-      setMsg('上线失败：' + e.message, 'err');
-    }
   }
 
   // ---------- 文章列表 ----------
@@ -509,7 +493,6 @@ import Base from '../layouts/Base.astro';
     // 操作按钮
     $('save-draft-btn').onclick = saveDraft;
     $('publish-btn').onclick = publish;
-    $('rebuild-btn').onclick = triggerBuild;
     $('new-btn').onclick = () => { setForm({}); setMsg(''); };
     $('delete-btn').onclick = async () => {
       if (!state.id) return;

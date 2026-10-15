@@ -34,7 +34,7 @@ npm run dev                 # 打开 http://localhost:4321
 
 三种方式，按习惯选：
 
-- **方式 A（写作后台，推荐）**：打开 `<域名>/login`，用 Supabase 账号登录 → 写标题/正文 → 「发布并上线」。发布只是写进 Supabase，**全站更新还需一次部署**（配了部署钩子则后台自动触发，否则手动到 Cloudflare 点一次部署）。
+- **方式 A（写作后台，推荐）**：打开 `<域名>/login`，用 Supabase 账号登录 → 写标题/正文 → 「发布并上线」。站点为 SSR 动态渲染，**发布即全站生效**，读者刷新即可看到，无需任何部署操作。
 - **方式 B（Supabase 表）**：Supabase 后台 → **Table Editor → posts** 手动加一行：
   `title / slug / content(Markdown) / excerpt / lang('zh'|'en') / category / category_slug / published=true / published_at`，再触发一次部署。
 - **方式 C（本地）**：直接编辑 `src/data/sample.js` 的示例数组，把内容换成你自己的，提交即更新。
@@ -66,11 +66,11 @@ npm run dev                 # 打开 http://localhost:4321
 
 ## 五、发布到线上（零成本优先）
 
-构建出纯静态文件：
+构建产物（含 SSR Worker）：
 ```bash
-npm run build     # 生成 dist/
+npm run build     # 生成 dist/（含 _worker.js）
 ```
-`dist/` 是纯静态站点，传到任何静态托管都行。**以下方案都不花钱（仅域名续费另算）。**
+站点为 **SSR 模式**：内容页每请求现查 Supabase，**发布文章无需重新构建**；只有改代码才需要构建部署。`dist/` 含 Cloudflare Pages Functions 运行时，部署到 Cloudflare Pages 即可。
 
 **方案 A（现在就用，¥0）：Cloudflare Pages 免费版（当前方案）**
 1. 仓库已推到 GitHub（`Passto-go/styleblog_V2.0`），在 Cloudflare 关联它：**Workers & Pages → Create → Pages → Connect to Git**；框架选 **Astro**，构建命令 `npm run build`，输出目录 `dist`。
@@ -108,10 +108,11 @@ life-blog-v1/
 ├─ supabase/schema.sql     # 建表+权限+图床
 ├─ public/styles.css
 ├─ public/avatar.png       # 头像（放到 public/ 即自动启用）
-├─ public/_headers         # 缓存头（Cloudflare/Netlify 通用）
-├─ astro.config.mjs       # site 默认值，可用 PUBLIC_SITE_URL 环境变量覆盖
+├─ public/_headers         # 静态资源缓存头
+├─ astro.config.mjs       # site 默认值；output:server + Cloudflare 适配器
+├─ wrangler.toml          # Cloudflare Pages 配置（nodejs_compat 等）
 ├─ .nvmrc                 # Node 22（Cloudflare Pages 构建版本）
-└─ netlify.toml           # Netlify 构建配置（过渡期保留，Cloudflare 忽略此文件）
+└─ .env.example           # 环境变量样例
 ```
 
 > 改站点名 / 版权起始年 / 外链：编辑 `src/data/site.js`。

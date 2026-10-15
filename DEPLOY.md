@@ -1,9 +1,10 @@
-# 部署指南（Cloudflare Pages · 推荐 Git 自动部署）
+# 部署指南（Cloudflare Pages · SSR 动态模式）
 
-> 站点为 Astro 纯静态构建，读者侧不连数据库，国内外均可访问。
+> 站点为 Astro SSR：内容页（首页/文章/分类/归档/RSS/sitemap/搜索索引）每请求现查 Supabase，
+> **后台发布文章后即时生效，无需重新构建**。读者始终只访问 Cloudflare，不直连 Supabase。
 > 代码仓库：https://github.com/Passto-go/styleblog_V2.0 （分支 `main`）
 
-## 一、为什么从 Netlify 迁到 Cloudflare Pages
+## 一、为什么选 Cloudflare Pages
 
 | | Netlify 免费版 | Cloudflare Pages 免费版 |
 |---|---|---|
@@ -11,88 +12,92 @@
 | 构建额度 | 300 分钟/月 | **500 次/月** |
 | 免费子域名 | xxx.netlify.app | xxx.pages.dev |
 | 自定义域名 | 免费 | 免费（SSL 自动） |
-| Deploy Hook（发布后一键重建） | 支持 | 支持 |
 
-本站全部产物约 50+ 个文件、1 MB 上下，远低于「20,000 文件 / 单文件 25 MiB」的上限；带宽无限意味着不再有「额度焦虑」。Netlify 站点过渡期保留不动，两个地址都能访问，内容以最新一次部署为准。
+本站为 SSR 模式：**内容更新走 Supabase（零构建）**，只有改代码才需要构建部署，
+500 次/月对个人博客绰绰有余；带宽无限，没有额度焦虑。
 
-## 二、推荐：Git 自动部署（push 即上线）
+## 二、部署：Git 自动部署（唯一推荐路径）
 
-1. 打开 [Cloudflare Dashboard](https://dash.cloudflare.com) → **Workers & Pages → Overview → Create application → Pages → Connect to Git**
+> ⚠️ Cloudflare 的「直接上传（Direct Upload）」项目**创建后无法转为 Git 集成**。
+> 本仓库为 SSR（依赖构建生成的 `_worker.js`），请务必用 Git 方式创建项目。
+
+1. Cloudflare Dashboard → **Workers & Pages → Overview → Create application → Pages → Connect to Git**
 2. 授权 GitHub，选择仓库 `Passto-go/styleblog_V2.0`，Production branch 选 `main`
 3. 构建设置（Framework preset 选 **Astro** 后通常自动填好）：
    - Framework preset：**Astro**
    - Build command：**npm run build**
    - Build output directory：**dist**
+   （适配器会在 `dist` 里生成 `_worker.js`，Pages 自动识别并以 Functions 运行）
 4. **Environment variables**（Production 环境）添加：
 
-   | 变量 | 值 | 说明 |
+   | 变量 | 值 | 必填 |
    |---|---|---|
-   | `PUBLIC_SUPABASE_URL` | `https://wgqdqbstibhojmrfhtmg.supabase.co` | 必填，构建时拉线上文章 |
-   | `PUBLIC_SUPABASE_ANON_KEY` | `eyJ...` 开头的那串 anon public key | 必填，与 Netlify 后台已填的同一串 |
-   | `PUBLIC_SITE_URL` | `https://<项目名>.pages.dev` | 建议填，sitemap/RSS/canonical 地址才正确 |
-   | `NODE_VERSION` | `22` | 建议填（仓库已有 `.nvmrc`，双保险） |
-   | `PUBLIC_BUILD_HOOK` | 见下方「创建 Deploy Hook」 | 可选，配了才有一键上线 |
+   | `PUBLIC_SUPABASE_URL` | `https://wgqdqbstibhojmrfhtmg.supabase.co` | 是 |
+   | `PUBLIC_SUPABASE_ANON_KEY` | `eyJ...` 那串 anon public key | 是 |
+   | `PUBLIC_SITE_URL` | `https://<项目名>.pages.dev` | 建议 |
+   | `NODE_VERSION` | `22` | 建议（仓库已有 `.nvmrc`，双保险） |
 
-   > anon key 本就设计为可公开（已烘进线上 JS），安全靠 RLS：未登录只能读已发布文章。
-5. 点 **Save and Deploy**，等约 1–2 分钟，得到 `https://<项目名>.pages.dev`
-6. 以后每次 `git push` 到 main 自动重新构建部署；每个 PR 还会自动生成预览部署
+5. **Save and Deploy**，约 1–2 分钟得到 `https://mystyle.pages.dev`
+6. 以后**只有改代码才需要 push**；发文不触发任何构建
 
-### 创建 Deploy Hook（可选，配 PUBLIC_BUILD_HOOK 用）
+### 兼容性标志（`wrangler.toml` 已带，无需手动配）
 
-项目 → **Settings → Builds & deployments → Deploy hooks → Add deploy hook**（旧界面叫 Builds → Add deploy hook）：
+SSR 依赖 Node 兼容层，仓库根目录的 `wrangler.toml` 已写好：
 
-- 名称随意（如 `blog-publish`），**Branch to build 选 `main`**
-- 复制形如 `https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/xxxx` 的 URL
-- 填进上面的 `PUBLIC_BUILD_HOOK` 环境变量，**重新部署一次**（环境变量要构建时才生效）
-- 之后在 `/login` 后台点「发布并上线」即自动触发一次重建，约 1 分钟全站生效
+```toml
+compatibility_flags = ["nodejs_compat"]
+compatibility_date = "2025-07-18"
+```
 
-> Deploy Hook URL 无需鉴权即有效，等同密码：不要提交进仓库、不要外发。
+缺 `nodejs_compat` 时 Worker 里任何 Node 内建调用会直接 500。
+**不要**加 `disable_nodejs_process_v2`：本地 wrangler 3.x 运行时不识别该标志会启动失败。
 
-## 三、备选：直接上传（不接 GitHub，像当年 Netlify 拖文件夹）
+## 三、发布文章的完整流程（SSR 版）
 
-适合先看效果、或暂不想授权 GitHub：
+1. 打开 `<域名>/login` 登录写作后台
+2. 写/改文章 → 点「**发布并上线**」
+3. 后台提示「已发布 ✓ 已即时生效」——**到此结束**，读者刷新即可看到
 
-1. 本地构建并打包（或直接用我已打好的 `blog-dist-*.zip`，解压即 `dist`）：
-   ```bash
-   PUBLIC_SITE_URL=https://<项目名>.pages.dev \
-   PUBLIC_SUPABASE_URL=https://wgqdqbstibhojmrfhtmg.supabase.co \
-   PUBLIC_SUPABASE_ANON_KEY=eyJ... \
-   npm run build
-   ```
-2. Cloudflare → **Workers & Pages → Create → Pages → Upload assets**，把 `dist` 文件夹拖进去
-3. 上传部署同样**不消耗构建次数、不限带宽**
-4. 缺点：每次更新都要重新 build 再拖；且此路与 Git 部署是两套入口，长期只用这一条的话，Git 那边的自动部署就不会被触发
+- 写库与上线合一：Supabase 是唯一事实源，不存在"库里改了、线上还是旧的"
+- 改错别字同样即时生效
+- 评论原本就是 realtime 动态，不受影响
+- 下架文章同样即时（`published=false` 后下一请求即消失）
 
-> 建议：先上传看效果，确认没问题后再接 Git 作为唯一入口。
+## 四、应急：直接上传（仅作备用，别当主路径）
 
-## 四、自定义域名（eu.org 批下来后）
+1. 本地构建：`bash /workspace/build-and-package.sh`（或手动 `npm run build`）
+2. Cloudflare → **Workers & Pages → Create → Pages → Upload assets** → 拖入解压出的 `dist`
+3. `_worker.js` 随目录一起上传，SSR 可工作（拖拽支持 `_worker.js`，不支持 functions 目录编译，本仓库不涉及）
+
+> ⚠️ 该方式创建的项目**以后无法转成 Git 集成**，且每次代码更新都要重新构建再拖。
+> 只在 Cloudflare 账号刚注册、Git 授权还没就绪时应急用，用完尽快迁到 Git 路径（新建 Git 项目即可）。
+
+## 五、自定义域名（eu.org 批下来后）
 
 1. Pages 项目 → **Custom domains → Set up a custom domain** → 填 `mystyle.eu.org`
-2. 解析（二选一，按你域名 DNS 在哪）：
-   - DNS 在 Cloudflare：自动配置，无需手工加记录
-   - 在别处（注册商 / Netlify DNS）：加 `CNAME`，主机记录 `mystyle`（或 `@`）指向 `<项目名>.pages.dev`
-3. SSL 证书自动签发
-4. 最后把环境变量 `PUBLIC_SITE_URL` 改成 `https://mystyle.eu.org` 并重新部署一次，RSS / sitemap / canonical 随之更新
+2. DNS 在 Cloudflare 则自动配置；在别处则加 `CNAME` 指向 `<项目名>.pages.dev`
+3. SSL 自动签发
+4. 把 `PUBLIC_SITE_URL` 改成 `https://mystyle.eu.org`，**重新部署一次**（RSS/sitemap/canonical 随之更新；文章内容不受影响）
 
-## 五、上线后验证清单
+## 六、上线后验证清单
 
-- [ ] 首页 200，文章列表与 Supabase 已发布文章一致（含《在陪伴学生成长中遇见更好的自己》）
-- [ ] `/en/`、`/ja/` 英文/日文版正常，语言切换不 404
-- [ ] `/login` 能登录，草稿保存 / 发布 / 粘贴图片上传正常
-- [ ] `/rss.xml`、`/sitemap-index.xml` 里的域名是 `pages.dev`（或你的自定义域名）
-- [ ] 文章页评论能加载、能发（评论按页面路径绑定，换域名不影响）
-- [ ] 深色模式、手机宽度（约 375px）显示正常
-- [ ] Deployments 列表能看到本次部署，Source 列显示 Git push / Deploy hook / 上传
+- [ ] 首页 200，文章列表 = Supabase 已发布文章
+- [ ] 后台发布一篇测试文章 → **不做任何部署操作**，刷新首页应立刻出现
+- [ ] `/posts/<slug>/` 200；乱写的 slug 返回 404（带 404 页面内容）
+- [ ] `/en/`、`/ja/` 正常，语言切换不 404
+- [ ] `/rss.xml`、`/sitemap-index.xml` 域名正确；`/search-index.json` 能返回文章
+- [ ] `/login` 能登录、粘贴图片上传正常；发布提示为「已即时生效」
+- [ ] 文章页评论能加载、能发
+- [ ] 深色模式、手机宽度正常；设计与此前静态版一致
 
-## 六、常见问题与应对
+## 七、常见问题与应对
 
 | 现象 | 原因 | 处理 |
 |---|---|---|
-| 构建在安装依赖阶段就失败，提示 Node 版本 | 构建镜像默认 Node 太低 | 仓库已带 `.nvmrc`(22)；再在后台环境变量加 `NODE_VERSION=22`，然后 Retry deployment |
-| 首页还是旧文章 / 只有示例文章 | 构建时没拉到 Supabase | 检查后台 `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY` 是否加在 **Production** 环境；改完要重新部署才生效 |
-| 后台提示「未检测到 Supabase 配置」 | 同上 | 同上；这两个值是构建时烘进静态文件的，不是运行时读取 |
-| 发布后站点没更新 | 静态站两段式：写库 ≠ 上线 | 配 Deploy Hook 自动触发；或手动 Deployments → Retry / 重新部署 |
-| 某些路径 404 但本地正常 | 尾斜杠 / 重定向差异 | 本站 `trailingSlash: 'ignore'`，一般无此问题；真遇到再加 `public/_redirects` |
-| 文件数超限 | 超过 20,000 文件 | 本站约 50+ 个，无需担心 |
-| Netlify 那边还能访问吗 | 能 | 不断链、不删站点，过渡期两地址并存；以最新部署方的内容为准 |
-| 评论数对不上 | 评论按 `page` 路径绑定 | 换域名不影响旧评论；只有页面路径变了才会分开计 |
+| 全站 500，日志提到 Node 内建模块 | 缺 nodejs_compat | `wrangler.toml` 已带；确认仓库根目录有该文件 |
+| 本地 `wrangler pages dev` 起不来，报 No such compatibility flag | 加了新版才有的标志（如 disable_nodejs_process_v2） | 删掉它，只留 nodejs_compat |
+| 文章发布了但页面没有 | 几乎不可能（无构建环节）；先确认 `published=true` | 访问 `/search-index.json` 看文章在不在 |
+| 页面 404 但文章确实存在 | slug 输错 / 语言不匹配（`/en/posts/` 只列 en 文章） | 从列表页点进去，别手拼 URL |
+| Supabase 临时故障 | 拉取失败会回退示例文章（保留的降级逻辑） | 站点不崩，恢复后自动正常 |
+| Worker CPU 超限（免费 10ms/调用） | 超长文 marked 渲染耗时 | 当前文章量级远未触顶；真触顶再加边缘缓存 |
+| 想给动态页加缓存 | 默认无缓存，发布零延迟 | 需要时在响应加 `s-maxage=60` 让边缘缓存 60 秒；个人博客当前没必要 |

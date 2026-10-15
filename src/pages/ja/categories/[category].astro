@@ -1,12 +1,11 @@
 ---
 import CategoryPage from '../../../components/pages/CategoryPage.astro';
+import FourOhFour from '../../404.astro';
 import { getCategories } from '../../../lib/posts.js';
 
-export async function getStaticPaths() {
-  const cats = await getCategories('ja');
-  return cats.map((c) => ({ params: { category: c.slug }, props: { slug: c.slug, lang: 'ja' } }));
-}
-
-const { lang, slug } = Astro.props;
+// SSR：每请求现查 Supabase，新分类/新文章发布后即刻可访问，无需重新构建
+const { category } = Astro.params;
+const cat = (await getCategories('ja')).find((c) => c.slug === category) || null;
+if (!cat) Astro.response.status = 404;
 ---
-<CategoryPage lang={lang} slug={slug} />
+{cat ? <CategoryPage lang="ja" slug={cat.slug} /> : <FourOhFour lang="ja" />}

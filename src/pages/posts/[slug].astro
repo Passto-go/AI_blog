@@ -1,12 +1,11 @@
 ---
 import PostPage from '../../components/pages/PostPage.astro';
+import FourOhFour from '../404.astro';
 import { getPosts } from '../../lib/posts.js';
 
-export async function getStaticPaths() {
-  const posts = await getPosts('zh');
-  return posts.map((p) => ({ params: { slug: p.slug }, props: { post: p, lang: 'zh' } }));
-}
-
-const { post, lang } = Astro.props;
+// SSR：每请求现查 Supabase，新文章发布后即刻可访问，无需重新构建
+const { slug } = Astro.params;
+const post = (await getPosts('zh')).find((p) => p.slug === slug) || null;
+if (!post) Astro.response.status = 404;
 ---
-<PostPage lang={lang} post={post} />
+{post ? <PostPage lang="zh" post={post} /> : <FourOhFour lang="zh" />}
