@@ -73,7 +73,7 @@ npm run build     # 生成 dist/
 `dist/` 是纯静态站点，传到任何静态托管都行。**以下方案都不花钱（仅域名续费另算）。**
 
 **方案 A（现在就用，¥0）：Cloudflare Pages 免费版（当前方案）**
-1. 仓库已推到 GitHub（`Passto-go/AI_blog`），在 Cloudflare 关联它：**Workers & Pages → Create → Pages → Connect to Git**；框架选 **Astro**，构建命令 `npm run build`，输出目录 `dist`。
+1. 仓库已推到 GitHub（`Passto-go/styleblog_V2.0`），在 Cloudflare 关联它：**Workers & Pages → Create → Pages → Connect to Git**；框架选 **Astro**，构建命令 `npm run build`，输出目录 `dist`。
 2. **Settings → Environment variables** 添加 `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY` / `PUBLIC_SITE_URL`（详见 `DEPLOY.md`）。
 3. 绑域名：**Custom domains → Set up a custom domain** → 填你的域名 → DNS 加 `CNAME` 指向 `<项目名>.pages.dev`（免费 HTTPS）。
 4. 以后发文：`/login` 发布 → 配了 Deploy Hook 就自动上线，否则回 Cloudflare 点一次部署。

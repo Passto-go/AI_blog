@@ -1,7 +1,7 @@
 # 部署指南（Cloudflare Pages · 推荐 Git 自动部署）
 
 > 站点为 Astro 纯静态构建，读者侧不连数据库，国内外均可访问。
-> 代码仓库：https://github.com/Passto-go/AI_blog （分支 `main`）
+> 代码仓库：https://github.com/Passto-go/styleblog_V2.0 （分支 `main`）
 
 ## 一、为什么从 Netlify 迁到 Cloudflare Pages
 
@@ -18,7 +18,7 @@
 ## 二、推荐：Git 自动部署（push 即上线）
 
 1. 打开 [Cloudflare Dashboard](https://dash.cloudflare.com) → **Workers & Pages → Overview → Create application → Pages → Connect to Git**
-2. 授权 GitHub，选择仓库 `Passto-go/AI_blog`，Production branch 选 `main`
+2. 授权 GitHub，选择仓库 `Passto-go/styleblog_V2.0`，Production branch 选 `main`
 3. 构建设置（Framework preset 选 **Astro** 后通常自动填好）：
    - Framework preset：**Astro**
    - Build command：**npm run build**
