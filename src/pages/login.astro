@@ -129,6 +129,10 @@ import Base from '../layouts/Base.astro';
   const DRAFT_KEY = 'wb-local-draft';
   const $ = (id) => document.getElementById(id);
 
+  // 必须在模块作用域声明：下方各函数（loadList / persist / uploadImages 等）
+  // 均在顶层定义，若把 client 关在 else 块内会因词法作用域取不到而抛 ReferenceError
+  let supabase = null;
+
   // 当前编辑态
   const state = { id: '', lang: 'zh', status: 'draft', filter: 'all', query: '' };
 
@@ -398,7 +402,7 @@ import Base from '../layouts/Base.astro';
     $('login-form').querySelector('button').disabled = true;
     showLogin();
   } else {
-    const supabase = createClient(URL, KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+    supabase = createClient(URL, KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 
     // 登录
     $('login-form').addEventListener('submit', async (e) => {
@@ -470,9 +474,48 @@ import Base from '../layouts/Base.astro';
       e.target.value = '';
     });
 
-    // 已有会话直接进工作台
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) showWorkbench(); else showLogin();
+    // ---------- 粘贴：图片直接上传插入；网页复制的图片转 Markdown ----------
+    // 纯文本粘贴走浏览器默认行为（已验证可用），这里只补齐图片场景
+    $('f-content').addEventListener('paste', (e) => {
+      const cd = e.clipboardData;
+      if (!cd) return;
+
+      // 1) 剪贴板中的图片文件：截图、或从文件夹复制的图片
+      const files = [];
+      if (cd.items) {
+        for (const it of cd.items) {
+          if (it.kind === 'file' && it.type.startsWith('image/')) {
+            const f = it.getAsFile();
+            if (f) files.push(f);
+          }
+        }
+      }
+      if (!files.length && cd.files) {
+        for (const f of cd.files) if (f.type.startsWith('image/')) files.push(f);
+      }
+      if (files.length) {
+        e.preventDefault();
+        uploadImages(files);
+        return;
+      }
+
+      // 2) 从网页复制的图片：text/html 中含 <img src="...">，转成 Markdown 图片语法
+      const html = cd.getData('text/html');
+      if (html && /<img\b[^>]*\ssrc=/i.test(html)) {
+        const urls = [...html.matchAll(/<img\b[^>]*?\ssrc=["']([^"']+)["']/gi)]
+          .map((m) => m[1])
+          .filter((u) => /^https?:\/\//i.test(u));
+        if (urls.length) {
+          e.preventDefault();
+          insertAtCursor(urls.map((u) => `![](${u})`).join('\n'));
+          $('upload-msg').textContent = `已插入 ${urls.length} 张图片 ✓`;
+        }
+      }
     });
+
+    // 已有会话直接进工作台
+    supabase.auth.getSession()
+      .then(({ data }) => { if (data.session) showWorkbench(); else showLogin(); })
+      .catch(() => showLogin());
   }
 </script>
