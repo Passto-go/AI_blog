@@ -40,31 +40,71 @@ function normalize(p) {
 }
 
 // 文章为「语言中立」：同一篇文章在所有语言视图下都展示，仅 UI 文案随语言切换。
-// 若某语言存在独立翻译（同 base slug、不同 -en / -ja 后缀），由 getPost / findTranslation 解析。
+// 同一篇文章的多个语言版本按「基准 slug」归组（hello / hello-en / hello-ja 的基准都是 hello），
+// 每个语言视图只挑选最匹配的一个版本展示，避免列表出现同篇多语言的重复条目。
 export async function getPosts(lang = 'zh') {
   const all = (await fetchAll()).map(normalize);
-  return all.sort(byDateDesc);
+  return pickPerArticle(all, lang);
 }
 
-export async function getAllPosts() {
-  return (await fetchAll()).map(normalize).sort(byDateDesc);
+export async function getAllPosts(lang = 'zh') {
+  return pickPerArticle((await fetchAll()).map(normalize), lang);
+}
+
+// 按基准 slug 归组，每组挑出最符合目标语言的版本；组内排序稳定，结果按发布时间倒序
+function pickPerArticle(all, lang) {
+  const groups = new Map();
+  for (const p of all) {
+    const base = baseSlug(p.slug);
+    if (!groups.has(base)) groups.set(base, []);
+    groups.get(base).push(p);
+  }
+  const out = [];
+  for (const versions of groups.values()) out.push(pickLangVersion(versions, lang));
+  return out.sort(byDateDesc);
+}
+
+// 从同一篇文章的多个语言版本中挑最匹配的一个。优先级：
+//   ① 基准 slug 且 lang 字段匹配（「同 slug + lang 区分」约定）
+//   ② slug 后缀 base-lang（「hello-en」约定，后台未设语言时 lang 常为默认 'zh'）
+//   ③ 任意 slug 但 lang 字段匹配
+//   ④ 基准 slug 本身（中文原文）
+//   ⑤ 第一个（兜底）
+function pickLangVersion(versions, lang) {
+  const base = baseSlug(versions[0].slug);
+  return (
+    versions.find((p) => p.slug === base && (p.lang || 'zh') === lang) ||
+    versions.find((p) => p.slug === `${base}-${lang}`) ||
+    versions.find((p) => (p.lang || 'zh') === lang) ||
+    versions.find((p) => p.slug === base) ||
+    versions[0]
+  );
 }
 
 // 语言无关的文章查找：保证任何语言视图下都能取到内容（中文原文兜底），永不空页。
-// 优先级：① 同 slug + 目标语言（精确翻译）② 同 base slug 的目标语言翻译 ③ 同 slug 任意语言（原文）
-// 按「slug 约定」解析文章：同一篇的三种语言版本 slug 为 base(zh) / base-en / base-ja。
-// 仅依赖 slug 约定匹配，不依赖 lang 字段——发布后台未强制语言选择，翻译文章的 lang
-// 常是默认 'zh'，若按 lang 过滤会匹配失败、回退中文（即「非中文进文章仍显示中文」的根因）。
+// 同时兼容两种翻译命名约定：
+//   ① 「同 slug + lang 字段」：英文版 slug 与中文版相同，靠 lang='en' 区分
+//   ② 「slug 后缀」：英文版 slug 为 base-en（后台未提供语言选择，lang 常为默认 'zh'）
+// 中文视图优先解析基准 slug，避免误命中 -en/-ja 版本；非中文视图优先 slug 后缀约定。
 export async function getPost(slug, lang = 'zh') {
   const all = (await fetchAll()).map(normalize);
   const base = baseSlug(slug);
-  const targetSlug = lang === 'zh' ? base : `${base}-${lang}`;
-  let p = all.find((x) => x.slug === targetSlug);
-  if (p) return p;
-  p = all.find((x) => x.slug === slug);
-  if (p) return p;
-  p = all.find((x) => x.slug === base);
-  return p || null;
+  if (lang === 'zh') {
+    return (
+      all.find((x) => x.slug === base && (x.lang || 'zh') === 'zh') ||
+      all.find((x) => x.slug === base) ||
+      all.find((x) => x.slug === slug && (x.lang || 'zh') === 'zh') ||
+      all.find((x) => x.slug === slug) ||
+      null
+    );
+  }
+  return (
+    all.find((x) => x.slug === `${base}-${lang}`) ||
+    all.find((x) => x.slug === slug && (x.lang || 'zh') === lang) ||
+    all.find((x) => x.slug === base) ||
+    all.find((x) => x.slug === slug) ||
+    null
+  );
 }
 
 // 读取站点动态配置（如倒计时）。表不存在 / 未配置时返回 null，调用方回退默认值。
@@ -117,14 +157,17 @@ export function baseSlug(slug) {
   return String(slug).replace(/-(en|ja)$/, '');
 }
 
-// 按「slug 约定」查找文章在其他语言下的对应版本：base(zh) / base-en / base-ja 是同一篇的三种语言。
-// 仅按 slug 匹配（不依赖 lang 字段），否则翻译文章 lang 为默认 'zh' 时匹配失败，
-// 会回退到首页（即「中文文章页切语言跳回首页」的根因）。
+// 查找文章在其他语言下的对应版本（用于文章页的语言切换按钮）。
+// 与 getPost 保持同一套优先级（同样走 pickLangVersion），确保「切换链接」与
+// 「点击后取到的内容」严格一致：链接用返回版本的 slug 生成，getPost 再按该 slug
+// 必然解析回同一版本。
+// 找不到该文章的任何版本时返回 null，调用方回退该语言首页（避免 404）。
 export async function findTranslation(slug, targetLang) {
-  const posts = await getPosts(targetLang); // 返回全部文章（语言中立）
+  const all = (await fetchAll()).map(normalize);
   const base = baseSlug(slug);
-  const targetSlug = targetLang === 'zh' ? base : `${base}-${targetLang}`;
-  return posts.find((p) => p.slug === targetSlug) || null;
+  const versions = all.filter((p) => baseSlug(p.slug) === base);
+  if (!versions.length) return null;
+  return pickLangVersion(versions, targetLang);
 }
 
 // 渲染 Markdown，并为 h2/h3 生成锚点 id；返回 { html, headings(用于目录) }

@@ -16,7 +16,8 @@ const { html, headings } = renderMarkdown(post.content || '');
 const dateStr = formatDate(post.published_at, lang);
 const catHref = post.categorySlug ? localizePath(`/categories/${post.categorySlug}/`, lang) : null;
 
-const allPosts = await getAllPosts();
+// 上下篇导航：按当前语言取列表（每篇只含该语言版本），避免跳到另一语言的同名文章
+const allPosts = await getAllPosts(lang);
 const cats = await getCategories(lang);
 const wordCount = (post.content || '').replace(/\s+/g, '').length;
 const idx = allPosts.findIndex((p) => p.slug === post.slug);
@@ -26,9 +27,10 @@ const shareUrl = Astro.site ? new URL(pagePath, Astro.site).href : pagePath;
 const prevPost = idx > 0 ? allPosts[idx - 1] : null;
 const nextPost = idx > -1 && idx < allPosts.length - 1 ? allPosts[idx + 1] : null;
 
-// 语言切换目标地址：文章 slug 按语言独立命名（hello / hello-en / hello-ja），
-// 直接用「替换 URL 前缀」会跳到不存在的页面（404）。
-// 这里按约定找到其他语言下的对应文章；找不到则回退该语言首页。
+// 语言切换目标地址：直接用「替换 URL 前缀」会跳到不存在的页面（404），
+// 因此按文章基准 slug 找到其他语言下的对应版本，用其 slug 生成链接。
+// 该语言没有译文时，findTranslation 返回中文原文 → 链接仍指向当前文章，
+// 用户留在本页（UI 变目标语言，正文回退中文）；仅当文章完全不存在时才回退该语言首页。
 const langHrefs = {};
 for (const code of Object.keys(languages)) {
   if (code === lang) continue;
