@@ -436,6 +436,9 @@ export const prerender = true;
     const btns = [$('tr-en-btn'), $('tr-ja-btn')];
     btns.forEach((b) => { b.disabled = true; b.style.opacity = '.55'; b.style.pointerEvents = 'none'; });
     setTrMsg(`正在翻译成${langName}，约需 10–40 秒…`, '');
+    // 超时护栏：覆盖服务端 503 退避重试（最长约 31 秒）+ Gemini 生成的全程，避免永久转圈
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 90000);
     try {
       const { data: sd } = await supabase.auth.getSession();
       const token = sd?.session?.access_token;
@@ -445,6 +448,7 @@ export const prerender = true;
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ title, excerpt, content, targetLang }),
+        signal: ctrl.signal,
       });
       const result = await resp.json().catch(() => ({}));
       if (!resp.ok) {
@@ -474,8 +478,13 @@ export const prerender = true;
         'ok'
       );
     } catch (e) {
-      setTrMsg('网络错误：' + (e?.message || '请求失败'), 'err');
+      if (e?.name === 'AbortError') {
+        setTrMsg('翻译超时（90 秒）。Gemini 免费层可能正繁忙，稍后再点一次试试', 'err');
+      } else {
+        setTrMsg('网络错误：' + (e?.message || '请求失败') + '（若挂代理，试试切换节点）', 'err');
+      }
     } finally {
+      clearTimeout(timer);
       btns.forEach((b) => { b.disabled = false; b.style.opacity = ''; b.style.pointerEvents = ''; });
     }
   }
