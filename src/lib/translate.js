@@ -142,9 +142,10 @@ async function chat({ baseUrl, apiKey, model, messages, maxTokens = 8192, temper
     });
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  // 免费层容量波动（503 "high demand"）与偶发 5xx/429：指数退避重试，最多 4 次尝试。
-  // 后台点一次翻译按钮应尽量拿到结果，而不是被瞬时过载打断。
-  const RETRY_DELAYS = [3000, 8000, 20000];
+  // 免费层容量波动（503 "high demand"）与偶发 5xx/429：指数退避重试，最多 6 次尝试
+  // （3+8+20+45+90 ≈ 166 秒覆盖窗口，对抗持续几分钟的容量波动）。
+  // 前端超时护栏相应放宽到 200 秒。
+  const RETRY_DELAYS = [3000, 8000, 20000, 45000, 90000];
   let status = 0;
   let lastDetail = '';
 
