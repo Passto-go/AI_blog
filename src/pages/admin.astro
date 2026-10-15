@@ -5,13 +5,13 @@ import AdminLayout from '../layouts/AdminLayout.astro';
 export const prerender = true;
 ---
 
-<AdminLayout title="写作后台" description="登录后在线撰写与发布文章">
+<AdminLayout title="后台管理界面" description="登录后在线撰写与发布文章">
   <div class="wb">
 
     <!-- ============ 未登录 ============ -->
     <section id="login-view" class="wb-login" hidden>
       <form id="login-form" class="wb-login-card">
-        <h1>写作后台</h1>
+        <h1>后台管理界面</h1>
         <p class="wb-sub">登录后即可撰写、发布文章</p>
 
         <div id="cfg-note" class="wb-alert" hidden>
@@ -33,7 +33,7 @@ export const prerender = true;
     <section id="workbench" class="wb-bench" hidden>
       <header class="wb-top">
         <div class="wb-top-left">
-          <strong>写作后台</strong>
+          <strong>后台管理界面</strong>
           <span id="wb-user" class="wb-user"></span>
         </div>
         <div class="wb-top-right">
@@ -42,14 +42,14 @@ export const prerender = true;
         </div>
       </header>
 
-      <!-- 模块导航：写作管理 / 评论管理 / 其他功能 -->
+      <!-- 模块导航：文章管理 / 评论管理 / 其他功能 -->
       <nav class="wb-modnav" id="wb-modnav">
-        <button type="button" data-mod="write" class="on">写作管理</button>
+        <button type="button" data-mod="write" class="on">文章管理</button>
         <button type="button" data-mod="comments">评论管理</button>
         <button type="button" data-mod="misc">其他功能</button>
       </nav>
 
-      <!-- ============ 模块一：写作管理 ============ -->
+      <!-- ============ 模块一：文章管理 ============ -->
       <section id="mod-write" class="wb-module">
         <div class="wb-grid">
           <!-- ---------- 编辑列 ---------- -->
@@ -75,6 +75,7 @@ export const prerender = true;
                   <button type="button" data-v="draft" class="on">草稿</button>
                   <button type="button" data-v="published">已发布</button>
                 </div>
+                <input id="f-author" class="wb-author-input" type="text" placeholder="作者" aria-label="作者" autocomplete="off" />
               </div>
 
               <div class="wb-tabs" id="wb-tabs">
@@ -116,7 +117,6 @@ export const prerender = true;
               <div class="wb-actions">
                 <button id="save-draft-btn" class="btn btn-ghost" type="button">存草稿</button>
                 <button id="publish-btn" class="btn" type="button">发布并上线</button>
-                <button id="new-btn" class="btn btn-ghost" type="button">新建</button>
                 <button id="delete-btn" class="btn btn-danger" type="button" hidden>删除</button>
                 <span id="save-msg" class="wb-hint"></span>
               </div>
@@ -129,6 +129,7 @@ export const prerender = true;
               <div class="wb-side-head">
                 <strong>文章</strong>
                 <span id="wb-count" class="wb-hint"></span>
+                <button id="new-article-btn" class="wb-new-article" type="button" title="新建一篇空白文章">＋ 新建文章</button>
               </div>
               <input id="wb-search" class="wb-search" type="search" placeholder="搜索标题…" />
               <div class="wb-filter" id="wb-filter">
@@ -240,7 +241,7 @@ export const prerender = true;
     loadComments();
   }
 
-  // ---------- 模块切换（写作管理 / 评论管理 / 其他功能） ----------
+  // ---------- 模块切换（文章管理 / 评论管理 / 其他功能） ----------
   const MODULES = ['write', 'comments', 'misc'];
   function switchModule(name) {
     if (!MODULES.includes(name)) return;
@@ -763,6 +764,7 @@ export const prerender = true;
     toggleNewCat(false);
     $('f-excerpt').value = p.excerpt || '';
     $('f-cover').value = p.cover || '';
+    $('f-author').value = (p.author || site.author || '').trim();
     $('f-content').value = p.content || '';
     state.lang = p.lang || 'zh';
     state.status = p.published === false ? 'draft' : (p.id ? 'published' : 'draft');
@@ -802,6 +804,7 @@ export const prerender = true;
       category_slug,
       excerpt: $('f-excerpt').value.trim(),
       cover: $('f-cover').value.trim(),
+      author: $('f-author').value.trim() || (site.author || ''),
       content: $('f-content').value,
       published: state.status === 'published',
     };
@@ -827,7 +830,7 @@ export const prerender = true;
 
   // 保存期间禁用按钮，防止快速连点导致两次 INSERT 同一 slug
   function setButtonsBusy(busy) {
-    ['save-draft-btn', 'publish-btn', 'delete-btn', 'new-btn'].forEach((id) => {
+    ['save-draft-btn', 'publish-btn', 'delete-btn', 'new-article-btn'].forEach((id) => {
       const b = $(id);
       if (!b) return;
       b.disabled = busy;
@@ -982,9 +985,10 @@ export const prerender = true;
       main.innerHTML =
         `<a class="wb-item-title" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="在新标签打开前台文章页">${escapeHtml(p.title || '(无标题)')}</a>
          <span class="wb-item-meta">
-           <span class="wb-badge">${LANGS[p.lang] || p.lang || 'zh'}</span>
            <span class="wb-badge ${p.published ? 'is-live' : 'is-draft'}">${p.published ? '已发布' : '草稿'}</span>
            <span class="wb-date">${d}</span>
+           <span class="wb-badge">${LANGS[p.lang] || p.lang || '中文'}</span>
+           <span class="wb-author">${escapeHtml(p.author || site.author || '')}</span>
          </span>`;
 
       // 右侧操作区：编辑在上、删除在下
@@ -1205,7 +1209,7 @@ export const prerender = true;
       showLogin();
     });
 
-    // 模块导航：写作管理 / 评论管理 / 其他功能
+    // 模块导航：文章管理 / 评论管理 / 其他功能
     $('wb-modnav').querySelectorAll('button').forEach((b) => {
       b.onclick = () => switchModule(b.dataset.mod);
     });
@@ -1213,7 +1217,7 @@ export const prerender = true;
     // 操作按钮
     $('save-draft-btn').onclick = saveDraft;
     $('publish-btn').onclick = publish;
-    $('new-btn').onclick = () => { setForm({}); setMsg(''); };
+    $('new-article-btn').onclick = () => { setForm({}); setMsg(''); $('f-title').focus(); };
     $('cd-save').onclick = saveCountdown;
 
     // 分类管理：新增分类
@@ -1281,7 +1285,7 @@ export const prerender = true;
 
     // 正文输入：预览 + 自动保存
     $('f-content').addEventListener('input', () => { renderPreview(); saveLocalDraft(); });
-    ['f-title', 'f-excerpt', 'f-cover', 'f-slug'].forEach((id) => {
+    ['f-title', 'f-excerpt', 'f-cover', 'f-slug', 'f-author'].forEach((id) => {
       $(id).addEventListener('input', () => {
         if (id === 'f-title') updateSlugHint();
         saveLocalDraft();

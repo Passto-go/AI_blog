@@ -1,116 +1,248 @@
-# 个人生活随笔博客 · v1.1（ 中英双语）
+# 吾道一以贯之 · 多语种个人博客
 
-技术栈：**Astro（纯静态） + Supabase（云端数据库）**。读者端为纯静态页面，国内外均可快速访问；文章写在 Supabase，构建时拉取生成静态页。
-
-> **写作后台在 `/login`**：邮箱密码登录后即可在线撰写、发布文章（需先配置 Supabase，见下）。
+> 一个支持**中文 / English / 日本語**三语、内容存于 Supabase、以 **Cloudflare Workers（SSR）** 零成本托管的个人博客系统。
 
 ---
 
-## 一、本地预览（5 分钟跑起来）
+## 一、项目简介
 
-```bash
-cd life-blog-v1
-npm install
-npm run dev                 # 打开 http://localhost:4321
+本仓库是一个面向个人写作的轻量级博客引擎，核心设计目标是：
+
+- **内容与代码分离**：文章、评论、站点动态配置全部存放在 Supabase 云端数据库；前端以 **SSR（服务端渲染）** 方式在每次请求时实时查询，发布/编辑文章**即时生效，无需重新构建**。
+- **三语同源**：同一篇文章可用 `lang` 字段区分语言版本，前台按 `/`（中文）、`/en/`（英文）、`/ja/`（日文）路由切换，缺失译文时给出友好提示。
+- **自带后台管理界面**：`/admin` 提供文章写作、评论审核、分类管理、倒计时配置等能力，无需登录第三方 CMS。
+- **零成本部署**：构建产物为标准 Cloudflare Worker，部署到 Workers 免费额度（无限带宽、3,000 构建分钟/月、10 万请求/天）。
+
+技术栈：**Astro 4 + @astrojs/cloudflare + Supabase + Cloudflare Workers**。
+
+---
+
+## 二、主要功能特性
+
+### 内容与前台
+- **三语支持**（中文 / English / 日本語）：导航语言切换 + `hreflang` SEO 标记；当某语言缺已发布译文时，文章页显示「暂无译文」横幅并保留原文可阅读。
+- **文章系统**：Markdown 正文、摘要、封面图、分类标签、按发布时间排序；支持文章目录（TOC）、字数统计、上一篇/下一篇、热门文章、相关分类。
+- **分类体系**：分类以「注册表（`categories` 表）」为权威来源，支持**新增 / 重命名 / 合并 / 删除**；重命名改动 Slug 后，旧链接通过 `category_aliases` 表做**严格 301 跳转**，不会 404。
+- **归档 / 分类 / 搜索**：按时间归档页、分类列表与分类详情页、纯前端站内搜索（读取 `/search-index.json`）。
+- **订阅与 SEO**：每语言独立的 RSS（`/rss.xml`、`/en/rss.xml`、`/ja/rss.xml`）、站点地图（`/sitemap-index.xml`）、canonical / Open Graph 元数据。
+- **小部件**：「今日寄语」（按语言每日轮换）、「倒计时」（目标日与名称由后台写入 `site_settings`）。
+- **体验细节**：深色模式、响应式布局、文章分享面板（微信 / 微博 / X / Telegram 等）、无译文提示。
+
+### 后台管理界面（`/admin`，独立页面）
+后台拆分为三个模块，顶部不经过前台导航栏：
+
+| 模块 | 能力 |
+|---|---|
+| **文章管理** | 文章列表按行展示（文章名称 / 发布日期 / 语言 / 作者 / 状态），行尾「编辑 / 删除」，点标题在新标签打开前台文章；列表右侧「＋ 新建文章」；支持「全部 / 已发布 / 草稿」筛选与标题搜索；编辑器含标题、语言、分类下拉（可新建）、作者、状态、Markdown 实时预览、一键翻译 |
+| **评论管理** | 查看全部评论（含待审 / 未通过）；审核（通过 / 驳回）、管理员回复（嵌套）、删除；「我的评论」面板凭令牌管理自己提交的评论 |
+| **其他功能** | 倒计时配置（目标日 + 事件名）；分类管理（新增 / 重命名 / 合并 / 删除，严格 301 联动） |
+
+后台还提供「进入前端首页」入口，退出登录后自动回到登录界面（会话监听）。
+
+### 评论系统
+- **先审后放**：新评论默认进入「待审核」，通过后才对外展示；三态（待审核 / 已通过 / 未通过）。
+- **本人管理**：匿名提交时分配随机 `delete_token`（存浏览器 `localStorage`），凭令牌查看与删除自己的评论（经 `security definer` RPC，绕过 RLS 取回）。
+- **管理员回复**：后台回复标记为 `is_admin=true`，匿名用户无法伪造；支持多级嵌套。
+- **数据校验**：昵称/邮箱/内容长度与邮箱格式在数据库策略层（RLS）强制校验。
+
+### 一键翻译（可选）
+后台管理界面可调用翻译接口，把文章译为目标语言版本（需配置翻译 key，详见配置章节）。
+
+---
+
+## 三、技术栈
+
+| 类别 | 选型 |
+|---|---|
+| 框架 | Astro `^4.16.0`（SSR：`output: 'server'`） |
+| 适配器 | `@astrojs/cloudflare` `~11.2.0`（`nodejs_compat`） |
+| 数据库 / 鉴权 | Supabase（Postgres + RLS + Auth + Storage + Realtime） |
+| Markdown | `marked` `^12.0.2` |
+| 订阅 / 站点地图 | `@astrojs/rss` `^4.0.7`、`@astrojs/sitemap` `^3.2.1` |
+| 运行时 | Cloudflare Workers（`npx wrangler deploy`） |
+| Node | 22（仓库 `.nvmrc` 已锁定） |
+
+---
+
+## 四、目录结构
+
+```
+styleblog_V2.0/
+├─ src/
+│  ├─ i18n/ui.js            # 中英日三语文案 + 路由辅助（localizePath / switchLangPath 等）
+│  ├─ data/
+│  │  ├─ site.js            # 站名 / 作者 / 版权 / 社交 / 寄语 / 倒计时默认值
+│  │  └─ sample.js          # 未配置 Supabase 时的示例文章（三语）
+│  ├─ lib/
+│  │  ├─ posts.js           # 从 Supabase 取文章 / 分类（注册表合并文章计数）/ 归档 / 别名 301
+│  │  ├─ format.js          # 日期 / 分组格式化
+│  │  ├─ quotes.js          # 今日寄语按「年内第几天」轮换
+│  │  └─ translate.js       # 翻译封装
+│  ├─ layouts/
+│  │  ├─ Base.astro         # 前台页面骨架（头/尾/SEO/hreflang）
+│  │  └─ AdminLayout.astro  # 后台独立外壳（不挂前台导航）
+│  ├─ components/
+│  │  ├─ Header.astro Footer.astro Icon.astro
+│  │  ├─ PostCard.astro ProfileCard.astro Share.astro Toc.astro
+│  │  ├─ Comments.astro Countdown.astro TodayQuote.astro
+│  │  └─ pages/             # 各页面体：Home / Archive / Categories / Category / About / Search / Post
+│  └─ pages/
+│     ├─ index.astro about.astro archive.astro search.astro
+│     ├─ categories/index.astro categories/[category].astro   # 分类列表 / 分类详情
+│     ├─ posts/[slug].astro rss.xml.js sitemap-index.xml.js search-index.json.js
+│     ├─ en/  ja/           # 英文 / 日文全量镜像（index/about/archive/categories/posts/search/rss）
+│     ├─ admin.astro         # 后台管理界面（三模块）
+│     ├─ api/translate.ts    # 一键翻译接口
+│     └─ 404.astro
+├─ supabase/
+│  ├─ schema.sql            # 建表 + RLS + 图床 + 评论 RPC（最先跑）
+│  ├─ categories.sql        # 分类注册表 + 自愈回填（其次）
+│  └─ posts_author.sql      # 给 posts 增加 author 列（文章作者字段）
+├─ public/
+│  ├─ styles.css            # 前台样式（含 .wb-* 后台作用域样式）
+│  ├─ avatar.png            # 头像（放入即启用）
+│  └─ _headers              # 静态资源缓存头
+├─ astro.config.mjs         # output:'server' + Cloudflare 适配器；site 取 PUBLIC_SITE_URL
+├─ wrangler.toml           # Cloudflare Workers 配置（main / assets / nodejs_compat / vars）
+├─ DEPLOY.md               # 部署指南（Cloudflare Workers · Git 构建 · SSR）
+├─ .env.example            # 环境变量样例
+├─ .nvmrc                  # Node 22
+└─ package.json            # scripts: dev / build / preview
 ```
 
-未配置 `.env` 时，站点会用 `src/data/sample.js` 的示例文章（含中英双语），照样能跑能构建。
+---
+
+## 五、快速开始（本地预览）
+
+```bash
+git clone <your-fork> styleblog_V2.0
+cd styleblog_V2.0
+npm install
+npm run dev          # 打开 http://localhost:4321
+```
+
+未配置 `.env` 时，站点使用 `src/data/sample.js` 的示例文章（中英日三语），预览、构建均可正常进行。
 
 ---
 
-## 二、配置 Supabase
+## 六、配置 Supabase（必做）
 
-1. 后台 → **SQL Editor** 执行 `supabase/schema.sql`（建表 + 权限 + 图床桶；已含 `lang / category / category_slug` 字段）。
-2. 后台 → **Project Settings → API** 复制 `Project URL` 和 `anon public` key，填进 `.env`（复制 `.env.example`）：
-   ```
-   PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-   PUBLIC_SUPABASE_ANON_KEY=xxxx
-   ```
-> `anon` key 本就可公开，前端使用安全；读受 RLS 限制，只对已发布文章开放。
+1. 在 [Supabase](https://supabase.com) 新建项目，进入 **SQL Editor**。
+2. 依次执行仓库内三个 SQL 文件（建议按此顺序，均可重复执行）：
+   - **`supabase/schema.sql`**：建 `posts` / `comments`（含 `add_comment`、`list_my_comments`、`delete_own_comment` 三个 RPC）/ `site_settings` / `category_aliases` 表，配置 RLS、图床桶 `images`、Realtime。
+   - **`supabase/categories.sql`**：建 `categories` 注册表，自愈历史脏数据，并把现有文章去重分类种子化进去。
+   - **`supabase/posts_author.sql`**：给 `posts` 增加 `author` 列（文章作者字段；不加此列时后台「发布 / 存草稿」会报错）。
+3. 进入 **Project Settings → API**，复制 `Project URL` 与 `anon public` key。
+4. 复制 `.env.example` 为 `.env` 并填入：
 
----
+```bash
+PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+PUBLIC_SUPABASE_ANON_KEY=eyJ...你的anon key
+# 站点对外地址（用于 sitemap / RSS / canonical）；部署后可设为 https://<项目名>.workers.dev
+PUBLIC_SITE_URL=
+```
 
-## 三、如何写文章
-
-三种方式，按习惯选：
-
-- **方式 A（写作后台，推荐）**：打开 `<域名>/login`，用 Supabase 账号登录 → 写标题/正文 → 「发布并上线」。站点为 SSR 动态渲染，**发布即全站生效**，读者刷新即可看到，无需任何部署操作。
-- **方式 B（Supabase 表）**：Supabase 后台 → **Table Editor → posts** 手动加一行：
-  `title / slug / content(Markdown) / excerpt / lang('zh'|'en') / category / category_slug / published=true / published_at`，再触发一次部署。
-- **方式 C（本地）**：直接编辑 `src/data/sample.js` 的示例数组，把内容换成你自己的，提交即更新。
-
-> 图片：传到 Supabase Storage 的 `images` 桶，复制公开 URL 填到 `cover`。
+> `anon` key 本就公开、前端使用安全；读者端读受 RLS 限制，仅对**已发布文章**与**已审核评论**开放。
 
 ---
 
-## 四、页面与功能
+## 七、环境变量与配置说明
+
+### 构建期 / 运行时变量（`.env` 或构建环境变量）
+
+| 变量 | 必填 | 说明 |
+|---|---|---|
+| `PUBLIC_SUPABASE_URL` | 是 | Supabase 项目 URL（不要带 `/rest/v1/` 后缀） |
+| `PUBLIC_SUPABASE_ANON_KEY` | 是 | Supabase `anon` key，构建时内联进 Worker |
+| `PUBLIC_SITE_URL` | 建议 | 站点对外地址，影响 sitemap / RSS / canonical 准确性 |
+
+> ⚠️ `PUBLIC_*` 为**构建时内联**变量，值在 `npm run build` 那一刻写入产物；构建后改 Cloudflare 后台变量无法补救，务必先填真值再构建。
+
+### `wrangler.toml` 的 `[vars]`（随代码提交）
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `TRANSLATE_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai` | 翻译接口（OpenAI 兼容端点，示例指向 Google Gemini） |
+| `TRANSLATE_MODEL` | `gemini-3.8-flash` | 翻译模型名（按需修改） |
+
+### Cloudflare Secret（敏感，**不**写进代码）
+
+| 变量 | 说明 |
+|---|---|
+| `TRANSLATE_API_KEY` | 翻译服务密钥。Cloudflare 后台 → 项目 → **Settings → Variables and Secrets → Add（Type: Secret）** 添加；保存后 **Retry deployment** 生效，仅在服务端可见 |
+
+---
+
+## 八、数据库结构
+
+| 表 / 对象 | 作用 |
+|---|---|
+| `posts` | 文章：`title / slug / content(MD) / excerpt / cover / author / published / published_at / lang / category / category_slug` |
+| `comments` | 评论：`page / author / email / content / approved / rejected / parent_id / is_admin / delete_token`；含匿名提交与本人删除 RPC |
+| `site_settings` | 站点动态配置（如倒计时 `{name, target}`），键值对 `jsonb` |
+| `category_aliases` | 分类 Slug 旧→新映射，前台分类页 SSR 先查此表做 301 |
+| `categories` | 分类注册表（`name / slug`），名称显示权威源，支持 0 篇文章也展示 |
+| `storage.buckets.images` | 图床（公开读，仅登录可上传） |
+
+---
+
+## 九、后台使用说明
+
+1. 浏览器打开 `<域名>/admin`，用 Supabase 账号登录。
+2. **文章管理**：点「＋ 新建文章」写新文章，或在列表点某行「编辑」修改；每行展示文章名称 / 发布日期 / 语言 / 作者 / 状态，点标题可在新标签打开前台文章；用「全部 / 已发布 / 草稿」筛选。编辑器内填标题、语言、分类（可新建）、作者、正文，「发布并上线」即写库生效，读者刷新即可见。
+3. **评论管理**：审核待审评论（通过 / 驳回）、管理员回复、删除不当评论。
+4. **其他功能**：设置首页倒计时；管理分类（新增 / 重命名 / 合并 / 删除），重命名改动 Slug 后旧链接自动 301。
+
+> 发布文章**不触发任何构建**；只有改代码才需推送并重新部署。
+
+---
+
+## 十、页面与路由
 
 | 路径 | 说明 |
 |---|---|
-| `/` | 中文首页（Hero + 最新随笔卡片） |
-| `/en/` | 英文首页（中英切换见导航右上「EN / 中文」） |
-| `/about/`、`/en/about/` | 关于 |
-| `/categories/`、`/en/categories/` | 分类列表 |
-| `/categories/<slug>/` | 单个分类下的文章 |
-| `/archive/`、`/en/archive/` | 按时间归档 |
-| `/search/`、`/en/search/` | 站内搜索（纯前端，读取 `/search-index.json`） |
+| `/`、`/en/`、`/ja/` | 各语言首页（Hero + 最新随笔卡片） |
+| `/about/`、`/en/about/`、`/ja/about/` | 关于 |
+| `/categories/`、`/en/categories/`、`/ja/categories/` | 分类列表 |
+| `/categories/<slug>/` | 单个分类下的文章（旧 slug 走 301） |
+| `/archive/`、`/en/archive/`、`/ja/archive/` | 按时间归档 |
+| `/search/`、`/en/search/`、`/ja/search/` | 站内搜索（读 `/search-index.json`） |
 | `/posts/<slug>/` | 单篇文章（Markdown 渲染） |
-| `/rss.xml`、`/en/rss.xml` | RSS 订阅（中文 / 英文） |
+| `/rss.xml`、`/en/rss.xml`、`/ja/rss.xml` | 各语言 RSS |
 | `/sitemap-index.xml` | 站点地图 |
 | `/search-index.json` | 搜索索引（构建生成） |
+| `/admin` | 后台管理界面 |
 
-顶部导航：**主页 / 分类 / 关于 / 归档 / EN（语言切换）**，右侧三个图标分别是 **RSS / 站点地图 / 搜索**。
-底部栏：**主页 / 分类 / 关于 / 归档 / RSS** + 版权「YOUR NAME」+ *Licensed under CC BY-NC 4.0* + *Powered by Astro* + *Hosted by Cloudflare*。
-
----
-
-## 五、发布到线上（零成本优先）
-
-构建产物（含 SSR Worker）：
-```bash
-npm run build     # 生成 dist/（含 _worker.js）
-```
-站点为 **SSR 模式**：内容页每请求现查 Supabase，**发布文章无需重新构建**；只有改代码才需要构建部署。`dist/` 含 Cloudflare Worker 运行时（`_worker.js`），部署到 **Cloudflare Workers（Git 构建 / Workers Builds）**。
-
-**方案 A（现在就用，¥0）：Cloudflare Workers 免费版（当前方案）**
-1. 仓库已推到 GitHub（`Passto-go/styleblog_V2.0`），在 Cloudflare 关联它：**Workers & Pages → Create → Connect to Git**（选 **Workers**，不是 Pages）；框架选 **Astro**，构建命令 `npm run build`，输出目录 `dist`，Deploy command 自动为 `npx wrangler deploy`。
-2. **Settings → Builds → Build environment variables** 添加 `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY` / `PUBLIC_SITE_URL` / `NODE_VERSION=22`（详见 `DEPLOY.md`）。
-3. 绑域名：**Settings → Triggers → Custom Domains → Add Custom Domain** → 填你的域名 → DNS 加 `CNAME` 指向 `<项目名>.workers.dev`（免费 HTTPS）。
-4. 以后发文：`/login` 发布 → **即时生效，无需任何部署操作**；只有改代码才需 push 触发重建。
-
-> Cloudflare Workers 免费版**带宽无限 + 3,000 构建分钟/月 + 10 万请求/天**，没有 Netlify「300 分钟 + 100 GB」的额度焦虑。发文零构建，几乎用不完。
-> 国内访问预期：Cloudflare 在大陆同样「能用但偏慢」。等每月有 ¥15 左右，可迁移到国内 CDN，代码一行不用改。
-
-> ⚠️ 写作后台 `/login` 需要连通 Supabase；若你人在国内访问不畅，需在能联网的环境（代理）里登录写作。读者侧走 Cloudflare 边缘现查，不受影响。
+顶部导航：主页 / 分类 / 关于 / 归档 / 语言切换（中 / EN / 日本語）；右侧图标：RSS / 站点地图 / 搜索 / 登录 / 主题切换。
 
 ---
 
-## 六、目录结构
+## 十一、部署到线上（Cloudflare Workers）
 
-```
-life-blog-v1/
-├─ src/
-│  ├─ i18n/ui.js          # 中英双语文案 + 路由辅助
-│  ├─ data/site.js         # 站名 / 版权 / 外链配置
-│  ├─ data/sample.js       # 无 Supabase 时的示例文章（双语）
-│  ├─ lib/posts.js         # 构建时从 Supabase 拉文章 + 分类/归档
-│  ├─ lib/format.js        # 日期/分组格式化
-│  ├─ layouts/Base.astro   # 页面骨架（含头/尾、SEO、hreflang）
-│  ├─ components/          # Header / Footer / PostCard / Icon / 各页面体
-│  └─ pages/
-│     ├─ index.astro about.astro archive.astro search.astro
-│     ├─ categories/  posts/[slug].astro
-│     ├─ rss.xml.js  sitemap-index.xml.js  search-index.json.js
-│     └─ en/          # 全部页面的英文版（结构同中文）
-├─ supabase/schema.sql     # 建表+权限+图床
-├─ public/styles.css
-├─ public/avatar.png       # 头像（放到 public/ 即自动启用）
-├─ public/_headers         # 静态资源缓存头
-├─ astro.config.mjs       # site 默认值；output:server + Cloudflare 适配器
-├─ wrangler.toml          # Cloudflare Workers 配置（main + assets + nodejs_compat）
-├─ .nvmrc                 # Node 22（Cloudflare 构建版本）
-└─ .env.example           # 环境变量样例
-```
+站点为 **Astro SSR**，构建产物含 Cloudflare Worker 运行时（`dist/_worker.js/index.js`），部署到 **Cloudflare Workers（Git 构建）**。详细步骤、额度说明、排错表见 **`DEPLOY.md`**，要点：
 
-> 改站点名 / 版权起始年 / 外链：编辑 `src/data/site.js`。
-> 改导航或文案：编辑 `src/i18n/ui.js`（中英两栏）。
+1. Cloudflare Dashboard → **Workers & Pages → Create → Connect to Git**，选 **Workers**（不是 Pages），仓库 `main` 分支。
+2. 构建设置：Framework `Astro`，Build `npm run build`，Output `dist`，Deploy `npx wrangler deploy`（由 `wrangler.toml` 驱动）。
+3. **Settings → Builds → Build environment variables** 添加 `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY` / `PUBLIC_SITE_URL` / `NODE_VERSION=22`。
+4. **Save and Deploy** → 得到 `https://<项目名>.workers.dev`。
+5. 绑定自定义域名：**Settings → Triggers → Custom Domains**（免费 HTTPS）。
+
+> 国内访问预期：Cloudflare 在大陆「能用但偏慢」；后台管理界面需能连通 Supabase（必要时在可联网环境登录），读者侧走 Cloudflare 边缘现查不受影响。
+
+---
+
+## 十二、自定义与扩展
+
+- **站名 / 作者 / 版权 / 社交 / 寄语 / 倒计时默认值**：编辑 `src/data/site.js`。
+- **导航与文案（三语）**：编辑 `src/i18n/ui.js`（中 / 英 / 日三栏）。
+- **样式**：编辑 `public/styles.css`（后台样式以 `.wb-*` 作用域隔离，不影响前台）。
+- **头像**：替换 `public/avatar.png` 即自动启用。
+- **新增翻译语言**：在 `src/i18n/ui.js` 的 `languages`、`ui` 与 `src/data/site.js` 的 `quotes` 增加对应语言，并补充 `src/pages/<lang>/` 镜像路由。
+
+---
+
+## 十三、许可证
+
+本项目内容采用 **CC BY-NC 4.0**（署名-非商业性使用）许可。
+
+> 由 **Astro + Supabase + Cloudflare** 构建。

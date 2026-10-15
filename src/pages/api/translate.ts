@@ -35,7 +35,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     // 1. 鉴权：校验 Supabase 会话 token，确保是已登录的管理员
     const auth = request.headers.get('Authorization') || '';
     const token = auth.replace(/^Bearer\s+/i, '').trim();
-    if (!token) return json({ error: '未登录或会话已过期，请重新登录写作后台' }, 401);
+    if (!token) return json({ error: '未登录或会话已过期，请重新登录后台管理界面' }, 401);
 
     const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
     const supabaseAnon = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
@@ -48,7 +48,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       const supabase = createClient(supabaseUrl, supabaseAnon);
       const { data, error } = await supabase.auth.getUser(token);
       if (error || !data?.user) {
-        return json({ error: '会话无效，请重新登录写作后台' }, 401);
+        return json({ error: '会话无效，请重新登录后台管理界面' }, 401);
       }
       userId = data.user.id;
     } catch {

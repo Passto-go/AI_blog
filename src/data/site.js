@@ -82,8 +82,8 @@ export const site = {
   // 例：高考 target:'2027-06-07T09:00:00' name:'高考'
   countdown: { target: '2027-01-01T00:00:00', name: '元旦' },
 
-  // 写作后台（顶栏「登录」入口指向这里）
-  loginPath: '/login',
+  // 后台管理界面（顶栏「登录」入口指向这里）
+  loginPath: '/admin',
 };
 
 export function copyrightText() {
