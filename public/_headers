@@ -1,0 +1,8 @@
+# 缓存头（Cloudflare Pages 与 Netlify 均支持此文件）
+# Astro 构建产物（/_astro/*）文件名带内容哈希：内容变文件名才变，可长期强缓存
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# 图片等静态资源：缓存 1 天
+/avatar.png
+  Cache-Control: public, max-age=86400

@@ -4,7 +4,7 @@ import { useTranslations } from '../i18n/ui.js';
 
 const { lang = 'zh', page } = Astro.props;
 const t = useTranslations(lang);
-// 运行时读浏览器内联的公开 key（构建时由 .env / Netlify 环境变量注入）
+// 运行时读浏览器内联的公开 key（构建时由 .env / 部署平台环境变量注入）
 const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.env.PUBLIC_SUPABASE_ANON_KEY);
 ---
 {configured ? (

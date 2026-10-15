@@ -104,7 +104,7 @@ export const ui = {
     'footer.copyright': 'Copyright © {year} 皮蛋solo粥',
     'footer.license': 'Licensed under CC BY-NC 4.0',
     'footer.powered': 'Powered by Astro',
-    'footer.hosted': 'Hosted by Netlify',
+    'footer.hosted': 'Hosted by Cloudflare',
 
     '404.title': '页面不存在',
     '404.desc': '你访问的页面可能已被移除或从未存在。',
@@ -205,7 +205,7 @@ export const ui = {
     'footer.copyright': 'Copyright © {year} 皮蛋solo粥',
     'footer.license': 'Licensed under CC BY-NC 4.0',
     'footer.powered': 'Powered by Astro',
-    'footer.hosted': 'Hosted by Netlify',
+    'footer.hosted': 'Hosted by Cloudflare',
 
     '404.title': 'Page not found',
     '404.desc': 'The page you requested may have been removed or never existed.',
@@ -306,7 +306,7 @@ export const ui = {
     'footer.copyright': 'Copyright © {year} 皮蛋solo粥',
     'footer.license': 'Licensed under CC BY-NC 4.0',
     'footer.powered': 'Powered by Astro',
-    'footer.hosted': 'Hosted by Netlify',
+    'footer.hosted': 'Hosted by Cloudflare',
 
     '404.title': 'ページが見つかりません',
     '404.desc': 'お探しのページは削除されたか、存在しません。',

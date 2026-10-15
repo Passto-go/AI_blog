@@ -12,7 +12,7 @@ import Base from '../layouts/Base.astro';
         <p class="wb-sub">登录后即可撰写、发布文章</p>
 
         <div id="cfg-note" class="wb-alert" hidden>
-          未检测到 Supabase 配置。请在 Netlify 环境变量中填入
+          未检测到 Supabase 配置。请在部署平台的环境变量中填入
           <code>PUBLIC_SUPABASE_URL</code> 与 <code>PUBLIC_SUPABASE_ANON_KEY</code> 后重新部署。
         </div>
 
@@ -323,15 +323,15 @@ import Base from '../layouts/Base.astro';
       setMsg('已保存，正在触发上线…');
       await triggerBuild();
     } else {
-      setMsg('已发布 ✓ 未配置构建钩子，请手动到 Netlify 重新部署', 'ok');
+      setMsg('已发布 ✓ 未配置部署钩子，站点将在下次部署后更新', 'ok');
     }
     clearLocalDraft();
     await loadList();
   }
 
-  // ---------- 一键上线（Netlify Build Hook） ----------
+  // ---------- 一键上线（部署钩子 Deploy Hook：Netlify Build Hook / Cloudflare Deploy Hook） ----------
   async function triggerBuild() {
-    if (!HOOK) { setMsg('未配置构建钩子（PUBLIC_BUILD_HOOK），无法一键上线', 'err'); return; }
+    if (!HOOK) { setMsg('未配置部署钩子（PUBLIC_BUILD_HOOK），无法一键上线', 'err'); return; }
     setMsg('正在触发上线…');
     try {
       const r = await fetch(HOOK, { method: 'POST' });

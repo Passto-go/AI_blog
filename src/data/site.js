@@ -17,7 +17,7 @@ export const site = {
     { name: 'Astro', url: 'https://astro.build' },
     { name: 'Supabase', url: 'https://supabase.com' },
   ],
-  hostedBy: { name: 'Netlify', url: 'https://www.netlify.com' },
+  hostedBy: { name: 'Cloudflare', url: 'https://www.cloudflare.com' },
 
   // 社交入口（资料卡底部）：icon 名称见 src/components/Icon.astro（github/email/rss/wechat/tiktok/link）
   // url 留空则该图标不显示
