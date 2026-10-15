@@ -204,6 +204,8 @@ a { color: inherit; }
 .page-title { font-size: 30px; margin: 0 0 8px; color: var(--text-strong); }
 .lead { color: var(--muted); font-size: 16px; margin: 0 0 28px; }
 .prose p { margin: 1.1em 0; }
+.prose h2 { font-size: 19px; margin: 1.9em 0 0.5em; color: var(--text-strong); line-height: 1.4; }
+.prose h2:first-child { margin-top: 0; }
 .crumbs { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
 .crumbs a { color: var(--muted); text-decoration: none; }
 .crumbs a:hover { color: var(--accent); }
@@ -433,6 +435,33 @@ a { color: inherit; }
 .wb-item-del { border: none; background: none; cursor: pointer; font: inherit; font-size: 11.5px; color: var(--muted); padding: 2px 4px; }
 .wb-item-del:hover { color: #cf222e; }
 [data-theme="dark"] .wb-item-del:hover { color: #f85149; }
+
+/* 后台评论管理 */
+.wb-cm-item { padding: 10px 6px; border-bottom: 1px solid var(--border); }
+.wb-cm-item:last-child { border-bottom: none; }
+.wb-cm-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.wb-cm-author { font-weight: 600; color: var(--text); font-size: 13.5px; }
+.wb-cm-status { font-size: 11px; }
+.wb-cm-status--pending { color: #9a6700; border-color: #f0dfb4; background: #fff8e6; }
+.wb-cm-status--approved { color: #1a7f37; border-color: #b7e4c7; background: #eafaef; }
+.wb-cm-status--rejected { color: #cf222e; border-color: #ffc9c9; background: #fff1f0; }
+[data-theme="dark"] .wb-cm-status--pending { color: #d29922; border-color: #4d3d17; background: #241d0f; }
+[data-theme="dark"] .wb-cm-status--approved { color: #3fb950; border-color: #1f4f2b; background: #12261a; }
+[data-theme="dark"] .wb-cm-status--rejected { color: #f85149; border-color: #652b2b; background: #2d1214; }
+.wb-cm-page { font-size: 11.5px; color: var(--muted); }
+.wb-cm-text { margin: 6px 0 4px; font-size: 13px; color: var(--text); line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.wb-cm-date { font-size: 11.5px; color: var(--muted); }
+.wb-cm-acts { display: flex; gap: 6px; margin-top: 8px; }
+.wb-cm-act {
+  font: inherit; font-size: 12px; cursor: pointer; border-radius: 999px; padding: 2px 10px;
+  background: none; border: 1px solid var(--border); color: var(--muted); transition: color .15s, border-color .15s;
+}
+.wb-cm-approve:hover { color: #1a7f37; border-color: #b7e4c7; }
+.wb-cm-reject:hover { color: #9a6700; border-color: #f0dfb4; }
+.wb-cm-del:hover { color: #cf222e; border-color: #ffc9c9; }
+[data-theme="dark"] .wb-cm-approve:hover { color: #3fb950; border-color: #1f4f2b; }
+[data-theme="dark"] .wb-cm-reject:hover { color: #d29922; border-color: #4d3d17; }
+[data-theme="dark"] .wb-cm-del:hover { color: #f85149; border-color: #652b2b; }
 .wb-empty { font-size: 13px; color: var(--muted); text-align: center; padding: 20px 0; list-style: none; }
 
 /* 响应式：窄屏单栏 */
@@ -649,6 +678,37 @@ a { color: inherit; }
 .comment-body { margin: 0; color: var(--text); line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
 .comments-empty { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
 .comments-note { color: var(--muted); font-size: 14px; margin: 0; }
+
+/* 我的评论（本人提交、凭本地令牌管理） */
+.my-comments {
+  margin-top: 22px; padding: 16px; border: 1px dashed var(--border);
+  border-radius: var(--radius); background: var(--surface);
+}
+.my-comments-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.my-comments-head strong { font-size: 15px; color: var(--text-strong); }
+.my-comments-hint { font-size: 12px; color: var(--muted); }
+.my-comments-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.comment-mine { position: relative; }
+/* 审核状态徽标 */
+.comment-status {
+  font-size: 11px; font-weight: 600; border-radius: 999px; padding: 1px 8px;
+  border: 1px solid var(--border); white-space: nowrap;
+}
+.comment-status--pending { color: #9a6700; border-color: #f0dfb4; background: #fff8e6; }
+.comment-status--approved { color: #1a7f37; border-color: #b7e4c7; background: #eafaef; }
+.comment-status--rejected { color: #cf222e; border-color: #ffc9c9; background: #fff1f0; }
+[data-theme="dark"] .comment-status--pending { color: #d29922; border-color: #4d3d17; background: #241d0f; }
+[data-theme="dark"] .comment-status--approved { color: #3fb950; border-color: #1f4f2b; background: #12261a; }
+[data-theme="dark"] .comment-status--rejected { color: #f85149; border-color: #652b2b; background: #2d1214; }
+.comment-note { margin: 6px 0 0; font-size: 12px; color: #cf222e; }
+[data-theme="dark"] .comment-note { color: #f85149; }
+.comment-del {
+  display: inline-block; margin-top: 8px; font: inherit; font-size: 12px; cursor: pointer;
+  color: var(--muted); background: none; border: 1px solid var(--border);
+  border-radius: 999px; padding: 2px 10px; transition: color .15s, border-color .15s;
+}
+.comment-del:hover { color: #cf222e; border-color: #ffc9c9; }
+[data-theme="dark"] .comment-del:hover { color: #f85149; border-color: #652b2b; }
 
 
 /* ================= 分享区 ================= */

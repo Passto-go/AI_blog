@@ -4,14 +4,20 @@ import { useTranslations } from '../../i18n/ui.js';
 
 const { lang } = Astro.props;
 const t = useTranslations(lang);
-const paragraphs = t('about.body').split('\n\n');
+// 按空行切段；以「## 」开头的段落渲染为二级小标题，其余为正文段落
+const blocks = t('about.body')
+  .split('\n\n')
+  .map((b) => {
+    const m = b.match(/^##\s+([\s\S]+)$/);
+    return m ? { tag: 'h2', text: m[1] } : { tag: 'p', text: b };
+  });
 ---
 <Base lang={lang} title={t('about.title')} description={t('about.lead')}>
   <section class="page">
     <h1 class="page-title">{t('about.title')}</h1>
     <p class="lead">{t('about.lead')}</p>
     <div class="prose">
-      {paragraphs.map((p) => <p>{p}</p>)}
+      {blocks.map((b) => (b.tag === 'h2' ? <h2>{b.text}</h2> : <p>{b.text}</p>))}
     </div>
   </section>
 </Base>

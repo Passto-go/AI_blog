@@ -15,7 +15,17 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     data-name-required={t('post.commentNameRequired')}
     data-email-invalid={t('post.commentEmailInvalid')}
     data-load-failed={t('post.commentLoadFailed')}
-    data-retry={t('post.commentRetry')}>
+    data-retry={t('post.commentRetry')}
+    data-pending={t('post.commentPending')}
+    data-my-title={t('post.commentMyTitle')}
+    data-mine-hint={t('post.commentMineHint')}
+    data-status-pending={t('post.commentStatusPending')}
+    data-status-approved={t('post.commentStatusApproved')}
+    data-status-rejected={t('post.commentStatusRejected')}
+    data-status-rejected-note={t('post.commentStatusRejectedNote')}
+    data-del={t('post.commentDelete')}
+    data-del-confirm={t('post.commentDeleteConfirm')}
+    data-deleted={t('post.commentDeleted')}>
     <h2 class="comments-title">
       <Icon name="comment" size={18} />
       <span>{t('post.comments')}</span>
@@ -61,6 +71,16 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     </form>
 
     <ul class="comments-list" id="comments-list" aria-live="polite"></ul>
+
+    <!-- 我的评论：仅当前浏览器提交过评论时才显示，凭本地令牌读取并管理本人评论 -->
+    <section class="my-comments" id="my-comments" hidden>
+      <div class="my-comments-head">
+        <strong id="my-comments-title"></strong>
+        <span class="my-comments-hint" id="my-comments-hint"></span>
+      </div>
+      <ul class="my-comments-list" id="my-comments-list"></ul>
+    </section>
+
     <p class="comments-empty" id="comments-empty" hidden>{t('post.commentEmpty')}</p>
     <p class="comments-error" id="comments-error" hidden role="alert"></p>
   </section>
@@ -76,6 +96,15 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
   const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL;
   const SUPABASE_ANON_KEY = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
+  // 本人评论令牌存储：[{ id, page, token }]，仅存于当前浏览器
+  const STORE_KEY = 'styleblog-my-comments';
+  function loadStore() {
+    try { return JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); } catch { return []; }
+  }
+  function saveStore(arr) {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(arr)); } catch {}
+  }
+
   function fmtDate(iso, lang) {
     const locale = lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja-JP' : 'en-US';
     try {
@@ -86,9 +115,11 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     } catch (e) { return iso; }
   }
 
-  function renderItem(list, c, lang) {
+  // 渲染一条「公开」评论（已通过）
+  function renderPublicItem(list, c, lang) {
     const li = document.createElement('li');
     li.className = 'comment-item';
+    li.dataset.id = c.id;
 
     const head = document.createElement('div');
     head.className = 'comment-head';
@@ -111,6 +142,7 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     li.appendChild(head);
     li.appendChild(body);
     list.appendChild(li);
+    return li;
   }
 
   async function main() {
@@ -125,6 +157,16 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     const tEmailInvalid = root.dataset.emailInvalid || '请输入有效的邮箱地址。';
     const tLoadFailed = root.dataset.loadFailed || '评论加载失败';
     const tRetry = root.dataset.retry || '重试';
+    const tPending = root.dataset.pending || '评论已提交，审核通过后会展示。';
+    const tMyTitle = root.dataset.myTitle || '我的评论';
+    const tMineHint = root.dataset.mineHint || '';
+    const tStatusPending = root.dataset.statusPending || '待审核';
+    const tStatusApproved = root.dataset.statusApproved || '已通过';
+    const tStatusRejected = root.dataset.statusRejected || '未通过';
+    const tStatusRejectedNote = root.dataset.statusRejectedNote || '';
+    const tDel = root.dataset.del || '删除';
+    const tDelConfirm = root.dataset.delConfirm || '确定删除？';
+    const tDeleted = root.dataset.deleted || '已删除';
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     const form = document.getElementById('comments-form');
@@ -139,11 +181,18 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     const errEl = document.getElementById('comments-error');
     const countEl = document.getElementById('comments-count');
 
+    const mySection = document.getElementById('my-comments');
+    const myTitleEl = document.getElementById('my-comments-title');
+    const myHintEl = document.getElementById('my-comments-hint');
+    const myListEl = document.getElementById('my-comments-list');
+
+    // 本人评论 id 集合（用于公开列表去重，避免与「我的评论」面板重复）
+    let myIds = new Set();
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { persistSession: false },
     });
 
-    // 读取失败时把真实错误显示出来（表不存在 / RLS / key 错误都能一眼看出），并提供重试
     function showListError(msg) {
       if (!errEl) return;
       emptyEl.hidden = true;
@@ -153,7 +202,7 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
       retry.type = 'button';
       retry.className = 'comments-retry';
       retry.textContent = tRetry;
-      retry.addEventListener('click', function () { load(); });
+      retry.addEventListener('click', function () { loadPublic(); });
       errEl.appendChild(document.createTextNode(' '));
       errEl.appendChild(retry);
     }
@@ -161,7 +210,120 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
       if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
     }
 
-    async function load() {
+    function statusOf(c) {
+      if (c.approved) return 'approved';
+      if (c.rejected) return 'rejected';
+      return 'pending';
+    }
+
+    // 渲染一条「我的评论」（含状态徽标与删除按钮）
+    function renderMyItem(c) {
+      const li = document.createElement('li');
+      li.className = 'comment-item comment-mine';
+      li.dataset.id = c.id;
+
+      const head = document.createElement('div');
+      head.className = 'comment-head';
+
+      const name = document.createElement('span');
+      name.className = 'comment-author';
+      name.textContent = c.author || '匿名';
+
+      const time = document.createElement('span');
+      time.className = 'comment-time';
+      time.textContent = fmtDate(c.created_at, lang);
+
+      const badge = document.createElement('span');
+      const st = statusOf(c);
+      badge.className = 'comment-status comment-status--' + st;
+      badge.textContent =
+        st === 'approved' ? tStatusApproved : st === 'rejected' ? tStatusRejected : tStatusPending;
+
+      head.appendChild(name);
+      head.appendChild(time);
+      head.appendChild(badge);
+
+      const body = document.createElement('p');
+      body.className = 'comment-body';
+      body.textContent = c.content || '';
+
+      li.appendChild(head);
+      li.appendChild(body);
+
+      // 未通过时补充说明
+      if (st === 'rejected' && tStatusRejectedNote) {
+        const note = document.createElement('p');
+        note.className = 'comment-note';
+        note.textContent = tStatusRejectedNote;
+        li.appendChild(note);
+      }
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'comment-del';
+      del.textContent = tDel;
+      del.addEventListener('click', () => deleteMine(c.id));
+      li.appendChild(del);
+
+      return li;
+    }
+
+    // 凭本地令牌取回「本人」评论（可能多条、跨多个令牌）
+    async function loadMine() {
+      const store = loadStore().filter((s) => s.page === page);
+      if (!store.length) { toggleMy(false); return []; }
+      const tokens = [...new Set(store.map((s) => s.token))];
+      const all = [];
+      for (const tk of tokens) {
+        try {
+          const { data } = await supabase.rpc('list_my_comments', { p_page: page, p_token: tk });
+          if (data) all.push(...data);
+        } catch (e) { console.warn('[comments] loadMine failed', e); }
+      }
+      const seen = new Set();
+      const unique = all.filter((c) => c.id && !seen.has(c.id) ? (seen.add(c.id), true) : false);
+      myIds = new Set(unique.map((c) => c.id));
+      renderMine(unique);
+      toggleMy(unique.length > 0);
+      return unique;
+    }
+
+    function renderMine(list) {
+      myListEl.innerHTML = '';
+      list.forEach((c) => myListEl.appendChild(renderMyItem(c)));
+    }
+
+    function toggleMy(show) {
+      if (!mySection) return;
+      mySection.hidden = !show;
+      if (show) {
+        myTitleEl.textContent = tMyTitle;
+        myHintEl.textContent = tMineHint;
+      }
+    }
+
+    async function deleteMine(id) {
+      const store = loadStore();
+      const entry = store.find((s) => s.id === id && s.page === page);
+      if (!entry) return;
+      if (!confirm(tDelConfirm)) return;
+      try {
+        const { error } = await supabase.rpc('delete_own_comment', { p_id: id, p_token: entry.token });
+        if (error) { alert(tError + '：' + error.message); return; }
+      } catch (e) {
+        alert(tError + '：' + ((e && e.message) || String(e)));
+        return;
+      }
+      // 本地令牌移除；该评论若曾在公开列表展示（已通过）则也一并移除
+      saveStore(store.filter((s) => s.id !== id));
+      const pub = listEl.querySelector('[data-id="' + id + '"]');
+      if (pub) { pub.remove(); recountPublic(); }
+      await loadMine();
+      msgEl.textContent = tDeleted;
+      msgEl.className = 'comments-msg';
+    }
+
+    async function loadPublic() {
       try {
         const { data, error } = await supabase
           .from('comments')
@@ -176,19 +338,23 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
         }
         hideListError();
         listEl.innerHTML = '';
-        const rows = data || [];
-        rows.forEach((c) => renderItem(listEl, c, lang));
+        const rows = (data || []).filter((c) => !myIds.has(c.id));
+        rows.forEach((c) => renderPublicItem(listEl, c, lang));
         countEl.textContent = String(rows.length);
         emptyEl.hidden = rows.length > 0;
       } catch (e) {
-        // supabase-js 在网络层失败（断网/被墙/CORS/项目暂停）时会直接 throw 而非返回 error，
-        // 若不捕获会让整个评论区静默死亡——这里兜住并显示真实原因
         console.warn('[comments] load threw', e);
         showListError((e && e.message) || String(e));
       }
     }
 
-    // 实时：别人发的新评论自动出现（仅已审核）；订阅失败不影响评论显示
+    function recountPublic() {
+      const n = listEl.querySelectorAll('.comment-item').length;
+      countEl.textContent = String(n);
+      emptyEl.hidden = n > 0;
+    }
+
+    // 实时：审核通过的评论自动出现（仅已通过；订阅失败不影响展示）
     try {
       const channel = supabase
         .channel('comments:' + page)
@@ -197,10 +363,20 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
           filter: 'page=eq.' + page,
         }, (payload) => {
           const c = payload.new;
-          if (c && c.approved) {
-            renderItem(listEl, c, lang);
-            countEl.textContent = String(Number(countEl.textContent || '0') + 1);
-            emptyEl.hidden = true;
+          if (c && c.approved && !myIds.has(c.id)) {
+            renderPublicItem(listEl, c, lang);
+            recountPublic();
+          }
+        })
+        .on('postgres_changes', {
+          event: 'UPDATE', schema: 'public', table: 'comments',
+          filter: 'page=eq.' + page,
+        }, (payload) => {
+          const c = payload.new;
+          // 审核通过（且非本人评论，本人的已在「我的评论」面板）则加入公开列表
+          if (c && c.approved && !myIds.has(c.id)) {
+            const existing = listEl.querySelector('[data-id="' + c.id + '"]');
+            if (!existing) { renderPublicItem(listEl, c, lang); recountPublic(); }
           }
         })
         .subscribe(function (status) {
@@ -244,24 +420,28 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
       submitBtn.textContent = tSending;
 
       try {
-        const { error } = await supabase
-          .from('comments')
-          .insert({
-            page,
-            author: author.slice(0, 40),
-            email: email.slice(0, 120),
-            content: content.slice(0, 1000),
-          });
+        // 走 RPC 提交：服务端固定写入 approved=false（先审后放），并回传 delete_token 供本人删除
+        const { data, error } = await supabase.rpc('add_comment', {
+          p_page: page,
+          p_author: author.slice(0, 40),
+          p_email: email.slice(0, 120),
+          p_content: content.slice(0, 1000),
+        });
 
         if (error) {
-          console.warn('[comments] insert failed', error.message);
+          console.warn('[comments] add_comment failed', error.message);
           msgEl.textContent = tError + (error.message ? '：' + error.message : '');
           msgEl.className = 'comments-msg comments-msg-err';
           return;
         }
+        const row = data && data[0];
+        if (row && row.id) {
+          const store = loadStore();
+          store.push({ id: row.id, page, token: row.delete_token });
+          saveStore(store);
+        }
       } catch (e) {
-        // 网络层失败时 supabase-js 会 throw；显示真实原因便于排查
-        console.warn('[comments] insert threw', e);
+        console.warn('[comments] add_comment threw', e);
         msgEl.textContent = tError + '：' + ((e && e.message) || String(e));
         msgEl.className = 'comments-msg comments-msg-err';
         return;
@@ -270,16 +450,18 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
         submitBtn.textContent = original;
       }
       textEl.value = '';
-      msgEl.textContent = '';
-      // 默认 approved=true 时实时订阅会补上；这里主动刷新一次兜底
-      await load();
+      msgEl.textContent = tPending;
+      msgEl.className = 'comments-msg';
+      // 待审核：不进入公开列表，仅刷新「我的评论」面板展示状态
+      await loadMine();
     });
 
-    await load();
+    // 先取本人评论（得到 myIds 用于去重），再加载公开列表
+    await loadMine();
+    await loadPublic();
   }
 
   main().catch(function (e) {
-    // 最终兜底：任何未预期异常都不应让评论区静默死亡
     console.warn('[comments] main threw', e);
     var root = document.getElementById('comments');
     if (!root) return;

@@ -10,8 +10,8 @@ export const languages = {
 
 export const ui = {
   zh: {
-    'site.name': '皮蛋solo粥',
-    'site.tagline': '记录日常、跑步，和重新出发的日子。一个独居者的真实写作。',
+    'site.name': '吾道一以贯之',
+    'site.tagline': '记录跑步、生活，以及一些零散的观察和想法。',
     'site.description': '一个普通人的个人博客，记录生活随笔、跑步与日常观察。',
 
     'nav.home': '主页',
@@ -41,9 +41,9 @@ export const ui = {
     'profile.visits': '访问',
 
     'about.title': '关于',
-    'about.lead': '你好，我是皮蛋solo粥。',
+    'about.lead': '你好，我是老一贯。',
     'about.body':
-      '这里记录我的日常：跑步、独居生活，以及一些零散的观察和想法。\n\n不追热点，不刻意更新，只写当下真正想写的东西。文章以中文为主，也提供英文版本，方便海外的朋友阅读。',
+      '这里记录我的日常：跑步、生活，以及一些零散的观察和想法。\n\n不追热点，不刻意更新，只写当下真正想写的东西。文章以中文为主，也提供英文版本，方便海外的朋友阅读。\n\n## 为什么叫“吾道一以贯之”？\n\n出自《论语·里仁》——子曰：“参乎！吾道一以贯之。”曾子曰：“唯。”孔子对曾参说：我的道，用一个东西贯穿始终；曾参答：是。后来曾子解释为“忠恕而已矣”。\n\n内容板块可以是：读书笔记、思想随笔；也可以是个人成长、长期主义；还可以是自己摸索学习的心路历程。\n\n## 到底是什么？\n\n一个普通人的长期主义；读书、思考、写下去；不追热点，只写主线；忠恕而已；做自己。',
 
     'categories.title': '分类',
     'categories.intro': '按主题浏览全部文章。',
@@ -101,7 +101,18 @@ export const ui = {
     'post.commentLoadFailed': '评论加载失败',
     'post.commentRetry': '重试',
 
-    'footer.copyright': 'Copyright © {year} 皮蛋solo粥',
+    'post.commentPending': '评论已提交，审核通过后会公开展示。',
+    'post.commentMyTitle': '我的评论',
+    'post.commentMineHint': '仅你本人可见与管理自己提交的评论。',
+    'post.commentStatusPending': '待审核',
+    'post.commentStatusApproved': '已通过',
+    'post.commentStatusRejected': '未通过',
+    'post.commentStatusRejectedNote': '该评论未通过审核，已隐藏。',
+    'post.commentDelete': '删除',
+    'post.commentDeleteConfirm': '确定删除这条评论吗？此操作不可恢复。',
+    'post.commentDeleted': '已删除',
+
+    'footer.copyright': 'Copyright © {year} 老一贯',
     'footer.license': 'Licensed under CC BY-NC 4.0',
     'footer.powered': 'Powered by Astro',
     'footer.hosted': 'Hosted by Cloudflare',
@@ -111,8 +122,8 @@ export const ui = {
     '404.back': '返回首页',
   },
   en: {
-    'site.name': '皮蛋solo粥',
-    'site.tagline': 'Notes on everyday life, running, and starting over — written by a solo dweller.',
+    'site.name': '吾道一以贯之',
+    'site.tagline': 'Notes on running, life, and scattered thoughts.',
     'site.description': 'A personal blog about everyday life, running, and quiet observations.',
 
     'nav.home': 'Home',
@@ -142,9 +153,9 @@ export const ui = {
     'profile.visits': 'Views',
 
     'about.title': 'About',
-    'about.lead': "Hi, I'm 皮蛋solo粥.",
+    'about.lead': "Hi, I'm 老一贯.",
     'about.body':
-      'This is where I keep my everyday notes: running, living alone, and scattered thoughts.\n\nNo chasing trends, no forced schedule — I only write what I actually want to write. Posts are mainly in Chinese, with English versions for friends abroad.',
+      'This is where I keep my everyday notes: running, life, and scattered observations and thoughts.\n\nNo chasing trends, no forced schedule — I only write what I actually want to write. Posts are mainly in Chinese, with English versions for friends abroad.\n\n## Why “吾道一以贯之” (One Thread Through It All)?\n\nFrom the Analects, Book IV (Li Ren) — Confucius said, “Shen! My way is bound together by one single thread.” Master Zeng replied, “Yes.” Confucius meant that the whole of his way is strung upon one thing; Zeng later explained it as “loyalty and reciprocity (zhong shu), that is all.”\n\nThe content can be reading notes or reflective essays; it can also be personal growth, long-termism, or the winding path of learning something on my own.\n\n## So what is it, really?\n\nAn ordinary person’s long-termism: read, think, keep writing; don’t chase trends, just follow the main thread; loyalty and reciprocity; be yourself.',
 
     'categories.title': 'Categories',
     'categories.intro': 'Browse all posts by topic.',
@@ -202,7 +213,18 @@ export const ui = {
     'post.commentLoadFailed': 'Failed to load comments',
     'post.commentRetry': 'Retry',
 
-    'footer.copyright': 'Copyright © {year} 皮蛋solo粥',
+    'post.commentPending': 'Comment submitted. It will appear after moderation.',
+    'post.commentMyTitle': 'My comments',
+    'post.commentMineHint': 'Only you can see and manage the comments you submitted.',
+    'post.commentStatusPending': 'Pending',
+    'post.commentStatusApproved': 'Approved',
+    'post.commentStatusRejected': 'Rejected',
+    'post.commentStatusRejectedNote': 'This comment was rejected and is hidden.',
+    'post.commentDelete': 'Delete',
+    'post.commentDeleteConfirm': 'Delete this comment? This cannot be undone.',
+    'post.commentDeleted': 'Deleted',
+
+    'footer.copyright': 'Copyright © {year} 老一贯',
     'footer.license': 'Licensed under CC BY-NC 4.0',
     'footer.powered': 'Powered by Astro',
     'footer.hosted': 'Hosted by Cloudflare',
@@ -212,8 +234,8 @@ export const ui = {
     '404.back': 'Back to home',
   },
   ja: {
-    'site.name': '皮蛋solo粥',
-    'site.tagline': '日常、ランニング、そしてもう一度歩き出す日々。ひとり暮らしの等身大の記録。',
+    'site.name': '吾道一以贯之',
+    'site.tagline': 'ランニング、暮らし、そしてちょっとした想いの記録。',
     'site.description': '普通の人の個人ブログ。日常の雑記、ランニング、日々の気づきを綴る。',
 
     'nav.home': 'ホーム',
@@ -243,9 +265,9 @@ export const ui = {
     'profile.visits': '閲覧',
 
     'about.title': 'About',
-    'about.lead': 'こんにちは、皮蛋solo粥です。',
+    'about.lead': 'こんにちは、老一贯です。',
     'about.body':
-      'ここには僕の日常——ランニング、ひとり暮らし、ちょっとした気づき——を綴ります。\n\nトレンドを追わず、無理に更新もしません。そのとき本当に書きたいことを書くだけ。記事は中国語が中心ですが、海外の友だちのために英語版も用意しています。',
+      'ここには僕の日常——ランニング、暮らし、ちょっとした観察や想い——を綴ります。\n\n流行は追わず、無理に更新もしません。今ほんとうに書きたいことだけを書く。記事は中国語が中心で、海外の友だちのために英語版も用意しています。\n\n## なぜ「吾道一以貫之（吾が道は一以て之を貫く）」なのか\n\n『論語』里仁篇より——子曰く、「参や、吾が道は一以て之を貫く。」曾子曰く、「唯。」孔子は曾参に、自分の道はたったひとつのもので貫かれている、と説いた。曾子はのちにそれを「忠恕のみ」と解した。\n\nコンテンツは読書ノートや思想エッセイ、あるいは個人の成長、長期主義、自分で手探りに学んでいく心の軌跡でもあります。\n\n## 結局、何なのか\n\n一人の普通の人の長期主義。読み、考え、書き続ける。流行は追わず、ただ本筋を書く。忠恕のみ。自分らしくあること。',
 
     'categories.title': 'カテゴリ',
     'categories.intro': 'テーマ別にすべての記事を眺める。',
@@ -303,7 +325,18 @@ export const ui = {
     'post.commentLoadFailed': 'コメントの読み込みに失敗しました',
     'post.commentRetry': '再試行',
 
-    'footer.copyright': 'Copyright © {year} 皮蛋solo粥',
+    'post.commentPending': 'コメントを送信しました。承認後に公開されます。',
+    'post.commentMyTitle': '自分のコメント',
+    'post.commentMineHint': '自分が投稿したコメントだけが表示・管理できます。',
+    'post.commentStatusPending': '承認待ち',
+    'post.commentStatusApproved': '承認済み',
+    'post.commentStatusRejected': '非公開',
+    'post.commentStatusRejectedNote': 'このコメントは非承認となり非表示です。',
+    'post.commentDelete': '削除',
+    'post.commentDeleteConfirm': 'このコメントを削除しますか？元に戻せません。',
+    'post.commentDeleted': '削除しました',
+
+    'footer.copyright': 'Copyright © {year} 老一贯',
     'footer.license': 'Licensed under CC BY-NC 4.0',
     'footer.powered': 'Powered by Astro',
     'footer.hosted': 'Hosted by Cloudflare',

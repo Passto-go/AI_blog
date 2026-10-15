@@ -123,6 +123,20 @@ export const prerender = true;
             <button id="cd-save" class="btn" type="button">保存倒计时</button>
             <span id="cd-msg" class="wb-hint"></span>
           </div>
+
+          <div class="wb-card" id="cm-card">
+            <div class="wb-side-head">
+              <strong>评论管理</strong>
+              <span id="cm-count" class="wb-hint"></span>
+            </div>
+            <div class="wb-filter" id="cm-filter">
+              <button type="button" data-f="all" class="on">全部</button>
+              <button type="button" data-f="pending">待审核</button>
+              <button type="button" data-f="approved">已通过</button>
+              <button type="button" data-f="rejected">未通过</button>
+            </div>
+            <ul id="cm-list" class="wb-list"></ul>
+          </div>
         </aside>
       </div>
     </section>
@@ -171,6 +185,7 @@ export const prerender = true;
     $('wb-user').textContent = data?.user?.email || '';
     await loadList();
     loadCountdown();
+    loadComments();
   }
 
   // ---------- 首页倒计时（存于 site_settings） ----------
@@ -198,6 +213,90 @@ export const prerender = true;
       .upsert({ key: 'countdown', value: { name, target }, updated_at: new Date().toISOString() });
     if (error) { msg.textContent = '保存失败：' + error.message; msg.dataset.kind = 'err'; }
     else { msg.textContent = '已保存 ✓ 首页刷新即生效'; msg.dataset.kind = 'ok'; }
+  }
+
+  // ---------- 评论管理（管理员：可读/改/删全部评论） ----------
+  const cmState = { filter: 'all' };
+
+  function cmStatusOf(c) {
+    if (c.approved) return 'approved';
+    if (c.rejected) return 'rejected';
+    return 'pending';
+  }
+  const CM_STATUS_LABEL = { approved: '已通过', rejected: '未通过', pending: '待审核' };
+
+  async function loadComments() {
+    const ul = $('cm-list');
+    if (!ul) return;
+    let q = supabase.from('comments').select('*').order('created_at', { ascending: false });
+    const { data, error } = await q;
+    if (error) { ul.innerHTML = '<li class="wb-empty">读取失败：' + error.message + '</li>'; return; }
+    const all = data || [];
+    const counts = { all: all.length, pending: 0, approved: 0, rejected: 0 };
+    all.forEach((c) => { counts[cmStatusOf(c)]++; });
+    $('cm-count').textContent = `待审 ${counts.pending} · 通过 ${counts.approved} · 未过 ${counts.rejected}`;
+    const rows = all.filter((c) => cmState.filter === 'all' || cmStatusOf(c) === cmState.filter);
+    if (!rows.length) { ul.innerHTML = '<li class="wb-empty">没有匹配的评论</li>'; return; }
+    ul.innerHTML = '';
+    rows.forEach((c) => ul.appendChild(renderCommentItem(c)));
+  }
+
+  function renderCommentItem(c) {
+    const li = document.createElement('li');
+    li.className = 'wb-cm-item';
+    const st = cmStatusOf(c);
+    const d = c.created_at ? new Date(c.created_at).toLocaleString('zh-CN') : '';
+    const body = document.createElement('div');
+    body.className = 'wb-cm-body';
+    body.innerHTML =
+      `<div class="wb-cm-meta">
+         <span class="wb-cm-author">${escapeHtml(c.author || '匿名')}</span>
+         <span class="wb-badge wb-cm-status wb-cm-status--${st}">${CM_STATUS_LABEL[st]}</span>
+         <span class="wb-cm-page">${escapeHtml(c.page || '')}</span>
+       </div>
+       <div class="wb-cm-text">${escapeHtml(c.content || '')}</div>
+       <div class="wb-cm-date">${d}</div>`;
+    li.appendChild(body);
+
+    const acts = document.createElement('div');
+    acts.className = 'wb-cm-acts';
+
+    if (st !== 'approved') {
+      const approve = document.createElement('button');
+      approve.type = 'button';
+      approve.className = 'wb-cm-act wb-cm-approve';
+      approve.textContent = '通过';
+      approve.onclick = () => moderate(c.id, true, false);
+      acts.appendChild(approve);
+    }
+    if (st !== 'rejected') {
+      const reject = document.createElement('button');
+      reject.type = 'button';
+      reject.className = 'wb-cm-act wb-cm-reject';
+      reject.textContent = '驳回';
+      reject.onclick = () => moderate(c.id, false, true);
+      acts.appendChild(reject);
+    }
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'wb-cm-act wb-cm-del';
+    del.textContent = '删除';
+    del.onclick = async () => {
+      if (!confirm('确定删除这条评论？此操作不可恢复。')) return;
+      const { error } = await supabase.from('comments').delete().eq('id', c.id);
+      if (error) { alert('删除失败：' + error.message); return; }
+      await loadComments();
+    };
+    acts.appendChild(del);
+    li.appendChild(acts);
+    return li;
+  }
+
+  async function moderate(id, approved, rejected) {
+    const { error } = await supabase
+      .from('comments').update({ approved, rejected }).eq('id', id);
+    if (error) { alert('操作失败：' + error.message); return; }
+    await loadComments();
   }
 
   // ---------- 表单 ----------
@@ -531,6 +630,21 @@ export const prerender = true;
     $('publish-btn').onclick = publish;
     $('new-btn').onclick = () => { setForm({}); setMsg(''); };
     $('cd-save').onclick = saveCountdown;
+
+    // 评论管理：状态筛选
+    $('cm-filter').querySelectorAll('button').forEach((b) => b.onclick = () => {
+      cmState.filter = b.dataset.f;
+      $('cm-filter').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+      loadComments();
+    });
+
+    // 评论管理：实时订阅（管理员侧，审核/删除后自动刷新）
+    try {
+      supabase
+        .channel('admin-comments')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => loadComments())
+        .subscribe();
+    } catch (e) { console.warn('[admin] comments realtime 订阅失败（不影响手动刷新）', e); }
     $('delete-btn').onclick = async () => {
       if (!state.id) return;
       const { data: cur } = await supabase.from('posts').select('title').eq('id', state.id).single();

@@ -114,19 +114,20 @@ export function baseSlug(slug) {
 }
 
 // 按约定查找文章在其他语言下的对应版本（文章的 slug 按语言独立命名：
-// 如 hello / hello-en / hello-ja 是同一篇的三种语言）。
-// 匹配顺序：1) 同 slug（三语言共用 slug 的情况） 2) 基准 slug 或 基准+-lang 后缀。
-// 找不到返回 null（调用方回退到目标语言首页，避免 404）。
+// 如 hello / hello-en / hello-ja 是同一篇的三种语言；也兼容三语言共用同一个 slug、仅靠 lang 字段区分）。
+// 注意：getPosts() 自 7587c4a 起为「语言中立」（返回全部文章，不再按 lang 过滤），
+// 因此这里必须显式按 (p.lang === targetLang) 过滤，否则 p.slug === slug 会先命中当前语言版本
+// （例如中文原文 hello），导致切换语言后实际仍指向中文内容。
 export async function findTranslation(slug, targetLang) {
-  const posts = await getPosts(targetLang);
+  const posts = await getPosts(targetLang); // 返回全部文章（语言中立）
   const base = baseSlug(slug);
-  const candidates =
-    targetLang === 'zh' ? [base] : [base, `${base}-${targetLang}`];
-  return (
-    posts.find((p) => p.slug === slug) ||
-    posts.find((p) => candidates.includes(p.slug)) ||
-    null
-  );
+  const matches = (p) =>
+    (p.lang || 'zh') === targetLang &&
+    (p.slug === slug ||
+      p.slug === base ||
+      p.slug === `${base}-${targetLang}` ||
+      baseSlug(p.slug) === base);
+  return posts.find(matches) || null;
 }
 
 // 渲染 Markdown，并为 h2/h3 生成锚点 id；返回 { html, headings(用于目录) }

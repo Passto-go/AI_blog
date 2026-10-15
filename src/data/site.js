@@ -1,15 +1,15 @@
 // 站点全局配置：改这里即可换站名、作者、版权、外链、资料卡、今日寄语、倒计时
 export const site = {
-  name: '皮蛋solo粥',
-  author: '皮蛋solo粥',
+  name: '吾道一以贯之',
+  author: '老一贯',
   // 版权起始年份（页脚显示为「起始年–今年」）；若想只显示单年，把 startYear 设为空字符串
   startYear: '',
 
   // 头像：把图片放到 public/avatar.png 即可自动启用；留空则用 avatarFallback 首字占位
   avatar: '/avatar.png',
-  avatarFallback: '粥',
+  avatarFallback: '贯',
   // 资料卡一句话简介
-  tagline: '记录日常、跑步，和重新出发的日子。一个独居者的真实写作。',
+  tagline: '记录跑步、生活，以及一些零散的观察和想法。',
 
   license: { name: 'CC BY-NC 4.0', url: 'https://creativecommons.org/licenses/by-nc/4.0/' },
   // Powered by 为数组：本博客是 Astro 生成的静态站，文章数据存于 Supabase
