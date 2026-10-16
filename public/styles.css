@@ -263,7 +263,11 @@ a { color: inherit; }
 /* 文章正文表格：补齐缺失样式，修复裸表导致的列错位/无边框/宽表溢出 */
 .content table {
   display: block;
-  width: 100%;
+  /* fit-content：窄表收缩到内容宽度（列宽随单元格内容自适应），
+     超过容器时封顶为容器宽并由下方 overflow-x 横向滚动。
+     不能用 width:100%——block 化后块盒拉满容器而内部表盒仍按内容收缩，
+     会出现「外框全宽、列内容挤在左侧」的割裂布局。 */
+  width: fit-content;
   max-width: 100%;
   overflow-x: auto;
   border-collapse: collapse;
@@ -278,12 +282,16 @@ a { color: inherit; }
   text-align: left;
   vertical-align: top;
   line-height: 1.6;
+  /* 长 URL / 无空格长串：允许断行，避免撑爆列宽触发横向滚动 */
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .content thead th {
   background: var(--code-bg);
   color: var(--text-strong);
   font-weight: 600;
-  white-space: nowrap;
+  /* 不再 nowrap：短表头仍单行，长表头换行而非强行撑宽列 */
+  white-space: normal;
 }
 .content tbody tr:nth-child(2n) td { background: var(--bg); }
 .content table th[align="right"], .content table td[align="right"] { text-align: right; }
