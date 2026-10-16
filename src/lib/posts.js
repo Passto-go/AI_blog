@@ -13,11 +13,18 @@ async function fetchAll() {
     return samplePosts;
   }
   const supabase = createClient(URL, KEY, { auth: { persistSession: false } });
-  const { data, error } = await supabase
+  // 显式排除垃圾箱文章（deleted_at is null）：RLS 已据此过滤，此处再挡一道，
+  // 即使策略未及时更新也安全。若数据库尚未执行 posts_trash.sql（无该列），
+  // 回退为不带该条件的查询，避免整个前台因缺列而取不到文章。
+  let query = supabase
     .from('posts')
     .select('*')
-    .eq('published', true)
-    .order('published_at', { ascending: false });
+    .eq('published', true);
+  let { data, error } = await query.is('deleted_at', null).order('published_at', { ascending: false });
+  if (error && /deleted_at/.test(error.message || '')) {
+    console.warn('[posts] 未找到 deleted_at 列（请执行 supabase/posts_trash.sql），回退查询');
+    ({ data, error } = await query.order('published_at', { ascending: false }));
+  }
 
   if (error) {
     console.warn('[posts] 拉取失败，回退示例数据:', error.message);

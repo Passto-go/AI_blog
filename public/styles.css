@@ -583,6 +583,23 @@ a { color: inherit; }
 .wb-item-lang:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 .wb-author { font-size: 11px; color: var(--muted); }
 .wb-author::before { content: '作者 '; opacity: .75; }
+
+/* 垃圾箱：过滤按钮计数徽标 / 列表行状态 / 剩余保留天数 */
+.wb-filter-badge {
+  display: inline-block; margin-left: 5px; min-width: 16px; padding: 0 5px;
+  font-size: 10.5px; line-height: 16px; text-align: center; font-weight: 600;
+  color: var(--accent); background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 999px;
+}
+.wb-filter button.on .wb-filter-badge {
+  color: var(--surface); background: var(--accent); border-color: var(--accent);
+}
+.wb-badge.is-trash { color: #a04000; border-color: #f0d0b4; background: #fff3e6; }
+[data-theme="dark"] .wb-badge.is-trash { color: #e08a4a; border-color: #503418; background: #2a1c0e; }
+.wb-item-title.is-trash { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.wb-trash-left { font-size: 11px; color: #b45309; font-weight: 600; }
+[data-theme="dark"] .wb-trash-left { color: #e08a4a; }
 .wb-author-input {
   font: inherit; font-size: 12.5px; color: var(--text);
   background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;

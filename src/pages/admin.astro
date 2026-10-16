@@ -142,6 +142,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
                 <button type="button" data-f="all" class="on">全部</button>
                 <button type="button" data-f="published">已发布</button>
                 <button type="button" data-f="draft">草稿</button>
+                <button type="button" data-f="trash">垃圾箱<span id="trash-count" class="wb-filter-badge" hidden></span></button>
               </div>
               <ul id="post-list" class="wb-list"></ul>
             </div>
@@ -991,10 +992,21 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   // ---------- 文章列表 ----------
   let allPosts = [];
 
+  // 垃圾箱保留天数（与 supabase/posts_trash.sql 的 purge_expired_posts 默认值保持一致）
+  const TRASH_KEEP_DAYS = 5;
+
+  // 剩余保留天数：null 表示不在垃圾箱；<=0 表示已过期（等待下次清理）
+  function trashDaysLeft(deletedAt) {
+    if (!deletedAt) return null;
+    const deadline = new Date(deletedAt).getTime() + TRASH_KEEP_DAYS * 86400000;
+    return Math.ceil((deadline - Date.now()) / 86400000);
+  }
+
   function renderList() {
     const ul = $('post-list');
     ul.innerHTML = '';
     const q = state.query.trim().toLowerCase();
+    const inTrash = state.filter === 'trash';
 
     // 按 base slug 分组：同一篇文章的各语言版本合并为一行展示。
     // 分组键同时兼容两种多语言约定：「同 slug + lang 区分」与「slug 后缀 -en/-ja」。
@@ -1012,20 +1024,32 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       return { rep: sorted[0], versions: sorted };
     });
 
-    const rows = allRows.filter(({ rep, versions }) => {
-      // 标题搜索匹配组内任一语言版本；状态过滤同样按组内任一版本命中
-      const okFilter = state.filter === 'all'
+    // 垃圾箱视图：只看「整组都在垃圾箱」的文章（移入以整组为单位，故组内状态一致）；
+    // 常规视图：只看「整组都不在垃圾箱」的文章。两视图互斥，同一篇文章不会重复出现。
+    const rows = allRows.filter(({ versions }) => {
+      const groupInTrash = versions.every((p) => p.deleted_at);
+      if (inTrash !== groupInTrash) return false;
+      const okFilter = inTrash || state.filter === 'all'
         || versions.some((p) => (state.filter === 'published' ? p.published : !p.published));
       const okQuery = !q || versions.some((p) => (p.title || '').toLowerCase().includes(q));
       return okFilter && okQuery;
     });
-    // 组间按代表版发布时间倒序（与原列表顺序一致）
-    rows.sort((a, b) => new Date(b.rep.published_at || 0) - new Date(a.rep.published_at || 0));
+    // 垃圾箱按移入时间倒序；常规列表按发布时间倒序
+    if (inTrash) {
+      rows.sort((a, b) => new Date(b.rep.deleted_at || 0) - new Date(a.rep.deleted_at || 0));
+    } else {
+      rows.sort((a, b) => new Date(b.rep.published_at || 0) - new Date(a.rep.published_at || 0));
+    }
 
-    $('wb-count').textContent = `${rows.length} 篇 / 共 ${allPosts.length} 版`;
+    const totalTrash = allPosts.filter((p) => p.deleted_at).length;
+    $('wb-count').textContent = inTrash
+      ? `${rows.length} 篇在垃圾箱（保留 ${TRASH_KEEP_DAYS} 天）`
+      : `${rows.length} 篇 / 共 ${allPosts.filter((p) => !p.deleted_at).length} 版`;
+    const badge = $('trash-count');
+    if (badge) { badge.textContent = String(totalTrash); badge.hidden = totalTrash === 0; }
 
     if (!rows.length) {
-      ul.innerHTML = '<li class="wb-empty">没有匹配的文章</li>';
+      ul.innerHTML = inTrash ? '<li class="wb-empty">垃圾箱是空的</li>' : '<li class="wb-empty">没有匹配的文章</li>';
       return;
     }
 
@@ -1045,8 +1069,15 @@ Astro.response.headers.set('Cache-Control', 'no-store');
             `<button type="button" class="wb-item-lang" data-id="${v.id}" title="编辑${LANGS[v.lang || 'zh']}版">${LANGS[v.lang] || v.lang || '中文'}</button>`
         )
         .join('');
-      main.innerHTML =
-        `<a class="wb-item-title" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="在新标签打开前台文章页">${escapeHtml(rep.title || '(无标题)')}</a>
+      main.innerHTML = inTrash
+        ? `<span class="wb-item-title is-trash">${escapeHtml(rep.title || '(无标题)')}</span>
+           <span class="wb-item-meta">
+             <span class="wb-badge is-trash">垃圾箱</span>
+             <span class="wb-date">移入 ${rep.deleted_at ? new Date(rep.deleted_at).toLocaleDateString('zh-CN') : '—'}</span>
+             <span class="wb-trash-left" title="移入 ${TRASH_KEEP_DAYS} 天后自动彻底删除">${(() => { const L = trashDaysLeft(rep.deleted_at); return L === null ? '' : (L <= 0 ? '即将清理' : '剩 ' + L + ' 天'); })()}</span>
+             <span class="wb-item-langs">${langTags}</span>
+           </span>`
+        : `<a class="wb-item-title" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="在新标签打开前台文章页">${escapeHtml(rep.title || '(无标题)')}</a>
          <span class="wb-item-meta">
            <span class="wb-badge ${rep.published ? 'is-live' : 'is-draft'}">${rep.published ? '已发布' : '草稿'}</span>
            <span class="wb-date">${d}</span>
@@ -1061,32 +1092,66 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         };
       });
 
-      // 右侧操作区：编辑打开代表版（中文优先，其他语言点语言标签）；删除仅删代表版
+      // 右侧操作区：常规行＝编辑/移入垃圾箱；垃圾箱行＝恢复/彻底删除。均以整组（全部语言版本）为单位
       const acts = document.createElement('div');
       acts.className = 'wb-item-acts';
+      const ids = versions.map((v) => v.id);
 
-      const edit = document.createElement('button');
-      edit.type = 'button';
-      edit.className = 'wb-item-edit';
-      edit.textContent = '编辑';
-      edit.title = versions.length > 1 ? '打开中文版（其他语言请点左侧语言标签）' : '在编辑器中打开修改';
-      edit.onclick = () => openEditor(rep);
+      if (inTrash) {
+        const restore = document.createElement('button');
+        restore.type = 'button';
+        restore.className = 'wb-item-edit';
+        restore.textContent = '恢复';
+        restore.title = '恢复到文章列表（含全部语言版本）';
+        restore.onclick = async () => {
+          restore.disabled = true; restore.textContent = '恢复中…';
+          const { error } = await supabase.from('posts').update({ deleted_at: null }).in('id', ids);
+          if (error) { alert('恢复失败：' + error.message); restore.disabled = false; restore.textContent = '恢复'; return; }
+          await loadList();
+        };
 
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'wb-item-del';
-      del.textContent = '删除';
-      del.title = versions.length > 1 ? '仅删除中文版，其他语言版本不受影响' : '删除这篇文章';
-      del.onclick = async () => {
-        const tip = versions.length > 1 ? '（中文版）' : '';
-        if (!confirm('确定删除《' + (rep.title || '无标题') + '》' + tip + '？此操作不可恢复。')) return;
-        const { error } = await supabase.from('posts').delete().eq('id', rep.id);
-        if (error) { alert('删除失败：' + error.message); return; }
-        if (versions.some((p) => p.id === state.id)) setForm({});
-        await loadList();
-      };
+        const purge = document.createElement('button');
+        purge.type = 'button';
+        purge.className = 'wb-item-del';
+        purge.textContent = '彻底删除';
+        purge.title = '立即永久删除，无法恢复';
+        purge.onclick = async () => {
+          if (!confirm('彻底删除《' + (rep.title || '无标题') + '》？\n含全部语言版本，此操作不可恢复。')) return;
+          purge.disabled = true; purge.textContent = '删除中…';
+          const { error } = await supabase.from('posts').delete().in('id', ids);
+          if (error) { alert('删除失败：' + error.message); purge.disabled = false; purge.textContent = '彻底删除'; return; }
+          if (versions.some((p) => p.id === state.id)) setForm({});
+          await loadList();
+        };
 
-      acts.append(edit, del);
+        acts.append(restore, purge);
+      } else {
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'wb-item-edit';
+        edit.textContent = '编辑';
+        edit.title = versions.length > 1 ? '打开中文版（其他语言请点左侧语言标签）' : '在编辑器中打开修改';
+        edit.onclick = () => openEditor(rep);
+
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'wb-item-del';
+        del.textContent = '删除';
+        del.title = '移入垃圾箱（含全部语言版本），' + TRASH_KEEP_DAYS + ' 天后自动彻底删除';
+        del.onclick = async () => {
+          const tip = versions.length > 1 ? `（含 ${versions.length} 个语言版本）` : '';
+          if (!confirm('将《' + (rep.title || '无标题') + '》' + tip + '移入垃圾箱？\n' + TRASH_KEEP_DAYS + ' 天内可恢复，超期自动彻底删除。')) return;
+          del.disabled = true; del.textContent = '处理中…';
+          const { error } = await supabase.from('posts')
+            .update({ deleted_at: new Date().toISOString() }).in('id', ids);
+          if (error) { alert('删除失败：' + error.message); del.disabled = false; del.textContent = '删除'; return; }
+          if (versions.some((p) => p.id === state.id)) setForm({});
+          await loadList();
+        };
+
+        acts.append(edit, del);
+      }
+
       li.append(main, acts);
       ul.append(li);
     });
@@ -1099,8 +1164,18 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   }
 
   async function loadList() {
-    const { data, error } = await supabase
+    // 超期自动清理：把「移入垃圾箱超过 TRASH_KEEP_DAYS 天」的文章物理删除。
+    // 依赖 Supabase 侧 purge_expired_posts()（security definer，仅登录用户可调），
+    // 由后台加载时触发——免费档无需 Cron/Worker，打开后台即完成清理。
+    // 失败不影响列表加载（如尚未执行 posts_trash.sql 时会报函数不存在，静默忽略）。
+    try {
+      const { data: purged } = await supabase.rpc('purge_expired_posts', { p_days: TRASH_KEEP_DAYS });
+      if (purged > 0) setMsg(`已自动清理 ${purged} 篇超期文章`, 'ok');
+    } catch (e) { /* 函数未部署或网络异常：忽略，不阻塞列表 */ }
+
+    const query = supabase
       .from('posts').select('*').order('published_at', { ascending: false });
+    let { data, error } = await query;
     if (error) { $('post-list').innerHTML = '<li class="wb-empty">读取失败：' + error.message + '</li>'; return; }
     allPosts = data || [];
     loadCategoryOptions();
@@ -1345,11 +1420,13 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     $('delete-btn').onclick = async () => {
       if (!state.id) return;
       const { data: cur } = await supabase.from('posts').select('title').eq('id', state.id).single();
-      if (!confirm('确定删除《' + (cur?.title || '无标题') + '》？此操作不可恢复。')) return;
-      const { error } = await supabase.from('posts').delete().eq('id', state.id);
+      if (!confirm('将《' + (cur?.title || '无标题') + '》移入垃圾箱？\n' + TRASH_KEEP_DAYS + ' 天内可在「垃圾箱」恢复，超期自动彻底删除。')) return;
+      // 软删除：仅标记 deleted_at；前台 RLS 立即隐藏，5 天后由 purge_expired_posts 清理
+      const { error } = await supabase.from('posts')
+        .update({ deleted_at: new Date().toISOString() }).eq('id', state.id);
       if (error) { setMsg('删除失败：' + error.message, 'err'); return; }
       setForm({});
-      setMsg('已删除', 'ok');
+      setMsg('已移入垃圾箱', 'ok');
       await loadList();
       closeEditor();
     };
