@@ -201,8 +201,11 @@ export async function translateArticle({ title, excerpt, content, targetLang }, 
   const chunks = splitContent(content);
   const multi = chunks.length > 1;
   const results = [];
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   for (let i = 0; i < chunks.length; i++) {
+    // 段间间隔 2 秒：避免多段请求瞬间打出踩中供应商 RPM 限流（免费层尤其敏感）
+    if (i > 0) await sleep(2000);
     const partInfo = multi ? { index: i + 1, total: chunks.length } : null;
     const messages = [
       { role: 'system', content: buildSystemPrompt(targetLang) },
