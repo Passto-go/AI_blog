@@ -260,13 +260,6 @@ a { color: inherit; }
 .content a { color: var(--accent); }
 .content ul, .content ol { padding-left: 1.4em; }
 .content li { margin: .4em 0; }
-.content blockquote {
-  margin: 1.2em 0; padding: 12px 18px; background: var(--bg-soft);
-  border-left: 4px solid var(--accent); border-radius: 8px; color: var(--muted);
-}
-.content code { background: var(--code-bg); padding: 2px 6px; border-radius: 5px; font-size: .92em; }
-.content pre { background: #0f1420; color: #e6e9f0; padding: 16px; border-radius: 10px; overflow: auto; }
-.content pre code { background: none; padding: 0; color: inherit; }
 /* 文章正文表格：补齐缺失样式，修复裸表导致的列错位/无边框/宽表溢出 */
 .content table {
   display: block;
@@ -699,8 +692,8 @@ a { color: inherit; }
 .content li { margin: 4px 0; }
 .content blockquote { margin: 0 0 16px; padding: 0 1em; color: var(--muted); border-left: .25em solid var(--border); }
 .content blockquote p { margin: 8px 0; }
-.content code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--code-bg); padding: .2em .4em; border-radius: 6px; font-size: 85%; }
-.content pre { background: var(--code-bg); padding: 16px; border-radius: 8px; overflow: auto; margin: 0 0 16px; }
+.content code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--code-bg); padding: .2em .4em; border-radius: 6px; font-size: 85%; color: var(--text); }
+.content pre { background: var(--code-bg); padding: 16px; border-radius: 8px; overflow: auto; margin: 0 0 16px; color: var(--text); }
 .content pre code { background: none; padding: 0; font-size: 90%; }
 .content img { max-width: 100%; border-radius: 8px; }
 .content hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
