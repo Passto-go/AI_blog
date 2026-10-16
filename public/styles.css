@@ -15,6 +15,9 @@
   --radius: 10px;
   --wrap: 1080px;
   --header-bg: rgba(255,255,255,.82);
+  /* 顶栏导航文字 / 图标（跟随主题，深色下保持可读对比度） */
+  --nav-text: #4a5160;
+  --icon-text: #6b7280;
 }
 [data-theme="dark"] {
   --bg: #0d1117;
@@ -31,6 +34,8 @@
   --shadow: 0 1px 2px rgba(0,0,0,.4);
   --shadow-hover: 0 3px 10px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.5);
   --header-bg: rgba(13,17,23,.8);
+  --nav-text: #c9d1d9;
+  --icon-text: #9aa4b2;
 }
 * { box-sizing: border-box; }
 /* [hidden] 必须能压过组件里的 display 声明，否则「隐藏」元素仍占位显示 */
@@ -62,32 +67,38 @@ a { color: inherit; }
 }
 .main-nav { display: flex; align-items: center; gap: 18px; }
 .main-nav a {
-  color: #4a5160; text-decoration: none; font-size: 14px;
+  color: var(--nav-text); text-decoration: none; font-size: 14px;
   transition: color .15s; position: relative;
+  display: inline-flex; align-items: center; gap: 5px;
+  white-space: nowrap; flex: none;
 }
 .main-nav a:hover { color: var(--accent); }
+/* 导航图标：随文字颜色（currentColor），不被压缩 */
+.main-nav a svg { flex: none; display: block; }
 .lang-menu { display: flex; align-items: center; gap: 4px; }
 .lang-link {
   font-weight: 600; color: var(--muted); text-decoration: none;
   border: 1px solid transparent; border-radius: 999px;
   padding: 3px 9px; font-size: 13px; transition: color .15s, border-color .15s, background .15s;
+  display: inline-flex; align-items: center; gap: 5px;
 }
 .lang-link:hover { color: var(--accent); background: var(--accent-soft); }
+.lang-link svg { flex: none; display: block; }
 .header-actions { display: flex; align-items: center; gap: 14px; }
 .header-icons { display: flex; align-items: center; gap: 12px; }
 .header-icons a {
-  color: #6b7280; display: inline-flex; transition: color .15s, transform .15s;
+  color: var(--icon-text); display: inline-flex; transition: color .15s, transform .15s;
 }
 .header-icons a:hover { color: var(--accent); transform: translateY(-1px); }
 .theme-toggle {
-  background: none; border: none; color: #6b7280; cursor: pointer;
+  background: none; border: none; color: var(--icon-text); cursor: pointer;
   display: inline-flex; padding: 3px; border-radius: 8px;
   transition: color .15s, background .15s;
 }
 .theme-toggle:hover { color: var(--accent); background: var(--surface-2); }
 /* 登录入口：仅图标（与主题切换按钮同形态，hover 变色） */
 .login-link {
-  color: #6b7280; display: inline-flex; padding: 3px; border-radius: 8px;
+  color: var(--icon-text); display: inline-flex; padding: 3px; border-radius: 8px;
   transition: color .15s, background .15s;
 }
 .login-link:hover { color: var(--accent); background: var(--surface-2); }
@@ -778,7 +789,7 @@ a { color: inherit; }
 }
 .footer-inner { max-width: var(--wrap); margin: 0 auto; padding: 28px 20px; }
 .footer-nav { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 16px; }
-.footer-nav a { color: #4a5160; text-decoration: none; transition: color .15s; }
+.footer-nav a { color: var(--nav-text); text-decoration: none; transition: color .15s; }
 .footer-nav a:hover { color: var(--accent); }
 .footer-meta p { margin: 4px 0; }
 .footer-meta a { color: var(--accent); text-decoration: none; }
@@ -790,7 +801,7 @@ a { color: inherit; }
 }
 @media (max-width: 720px) {
   .header-inner { height: auto; flex-wrap: wrap; padding: 10px 0; gap: 8px; }
-  .main-nav { order: 3; width: 100%; justify-content: flex-start; gap: 16px; overflow-x: auto; }
+  .main-nav { order: 3; width: 100%; justify-content: flex-start; gap: 10px; flex-wrap: wrap; overflow-x: auto; }
   .header-actions { margin-left: auto; }
 }
 @media (max-width: 600px) {
