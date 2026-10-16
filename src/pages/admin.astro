@@ -107,8 +107,9 @@ export const prerender = true;
               </div>
 
               <details class="wb-more">
-                <summary>更多设置（Slug / 摘要 / 封面）</summary>
+                <summary>更多设置（发布时间 / Slug / 摘要 / 封面）</summary>
                 <div class="wb-more-body">
+                  <label>发布时间<input id="f-published-at" type="datetime-local" /><small id="published-at-hint" class="wb-hint">修改已发布文章的展示与排序时间；留空则保持原时间</small></label>
                   <label>Slug<input id="f-slug" placeholder="留空自动生成" /><small id="slug-hint" class="wb-hint"></small></label>
                   <label>摘要<input id="f-excerpt" placeholder="一句话摘要" /></label>
                   <label>封面 URL<input id="f-cover" placeholder="https://…" /></label>
@@ -715,7 +716,7 @@ export const prerender = true;
     const btns = [$('tr-en-btn'), $('tr-ja-btn')];
     btns.forEach((b) => { b.disabled = true; b.style.opacity = '.55'; b.style.pointerEvents = 'none'; });
     setTrMsg(`正在翻译成${langName}，免费层繁忙时最长等待约 3 分钟…`, '');
-    // 超时护栏：覆盖服务端 503 退避重试（最长约 166 秒）+ Gemini 生成的全程，避免永久转圈
+    // 超时护栏：覆盖服务端 503 退避重试（最长约 166 秒）+ 模型生成的全程，避免永久转圈
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 200000);
     try {
@@ -758,7 +759,7 @@ export const prerender = true;
       );
     } catch (e) {
       if (e?.name === 'AbortError') {
-        setTrMsg('翻译超时（200 秒）。Gemini 免费层可能持续繁忙，稍后再点一次试试', 'err');
+        setTrMsg('翻译超时（200 秒）。免费层可能持续繁忙，稍后再点一次试试', 'err');
       } else {
         setTrMsg('网络错误：' + (e?.message || '请求失败') + '（若挂代理，试试切换节点）', 'err');
       }
@@ -779,6 +780,8 @@ export const prerender = true;
     toggleNewCat(false);
     $('f-excerpt').value = p.excerpt || '';
     $('f-cover').value = p.cover || '';
+    $('f-published-at').value = toLocalInput(p.published_at);
+    $('published-at-hint').textContent = '修改已发布文章的展示与排序时间；留空则保持原时间';
     $('f-author').value = (p.author || site.author || '').trim();
     $('f-content').value = p.content || '';
     state.lang = p.lang || 'zh';
@@ -795,6 +798,15 @@ export const prerender = true;
 
   function syncSeg(container, value) {
     container.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === value));
+  }
+
+  // ISO 时间 → datetime-local 输入值（本地时区 "YYYY-MM-DDTHH:mm"）
+  function toLocalInput(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
   function collectRow() {
@@ -822,6 +834,10 @@ export const prerender = true;
       author: $('f-author').value.trim() || (site.author || ''),
       content: $('f-content').value,
       published: state.status === 'published',
+      // 发布时间：填写了新时间则随保存写入（ISO/UTC）；留空时不带该键，数据库列保持原值
+      published_at: $('f-published-at').value
+        ? new Date($('f-published-at').value).toISOString()
+        : undefined,
     };
   }
 
@@ -915,7 +931,8 @@ export const prerender = true;
       if (state.id) {
         ({ error } = await supabase.from('posts').update(row).eq('id', state.id));
       } else {
-        const r = await supabase.from('posts').insert({ ...row, published_at: new Date().toISOString() });
+        // 新建：作者预设了发布时间则用之，否则取当前时间
+        const r = await supabase.from('posts').insert({ ...row, published_at: row.published_at || new Date().toISOString() });
         error = r.error;
         if (!error && r.data?.[0]) state.id = r.data[0].id;
       }
@@ -974,39 +991,73 @@ export const prerender = true;
     const ul = $('post-list');
     ul.innerHTML = '';
     const q = state.query.trim().toLowerCase();
-    const rows = allPosts.filter((p) => {
-      const okFilter = state.filter === 'all'
-        || (state.filter === 'published' ? p.published : !p.published);
-      const okQuery = !q || (p.title || '').toLowerCase().includes(q);
-      return okFilter && okQuery;
+
+    // 按 base slug 分组：同一篇文章的各语言版本合并为一行展示。
+    // 分组键同时兼容两种多语言约定：「同 slug + lang 区分」与「slug 后缀 -en/-ja」。
+    const groupMap = new Map();
+    for (const p of allPosts) {
+      const key = baseSlug(p.slug);
+      if (!groupMap.has(key)) groupMap.set(key, []);
+      groupMap.get(key).push(p);
+    }
+    const langOrder = { zh: 0, en: 1, ja: 2 };
+    const allRows = [...groupMap.values()].map((posts) => {
+      const sorted = [...posts].sort(
+        (a, b) => (langOrder[a.lang || 'zh'] ?? 9) - (langOrder[b.lang || 'zh'] ?? 9)
+      );
+      return { rep: sorted[0], versions: sorted };
     });
 
-    $('wb-count').textContent = `${rows.length} / ${allPosts.length}`;
+    const rows = allRows.filter(({ rep, versions }) => {
+      // 标题搜索匹配组内任一语言版本；状态过滤同样按组内任一版本命中
+      const okFilter = state.filter === 'all'
+        || versions.some((p) => (state.filter === 'published' ? p.published : !p.published));
+      const okQuery = !q || versions.some((p) => (p.title || '').toLowerCase().includes(q));
+      return okFilter && okQuery;
+    });
+    // 组间按代表版发布时间倒序（与原列表顺序一致）
+    rows.sort((a, b) => new Date(b.rep.published_at || 0) - new Date(a.rep.published_at || 0));
+
+    $('wb-count').textContent = `${rows.length} 篇 / 共 ${allPosts.length} 版`;
 
     if (!rows.length) {
       ul.innerHTML = '<li class="wb-empty">没有匹配的文章</li>';
       return;
     }
 
-    rows.forEach((p) => {
+    rows.forEach(({ rep, versions }) => {
       const li = document.createElement('li');
-      li.className = 'wb-item' + (p.id === state.id ? ' on' : '');
+      li.className = 'wb-item' + (versions.some((p) => p.id === state.id) ? ' on' : '');
 
-      // 主体：标题 = 前台文章链接（新标签打开）；下方为元信息
+      // 主体：标题 = 前台文章链接，默认跳中文页面（代表版 zh 优先；zh 缺失时回退组内首个版本）
       const main = document.createElement('div');
       main.className = 'wb-item-main';
-      const d = p.published_at ? new Date(p.published_at).toLocaleDateString('zh-CN') : '';
-      const url = postUrl(p);
+      const d = rep.published_at ? new Date(rep.published_at).toLocaleDateString('zh-CN') : '';
+      const url = postUrl(rep);
+      // 语言标签：组内每个已存在的语言一个可点击标签，点击直接载入该版本进编辑器
+      const langTags = versions
+        .map(
+          (v) =>
+            `<button type="button" class="wb-item-lang" data-id="${v.id}" title="编辑${LANGS[v.lang || 'zh']}版">${LANGS[v.lang] || v.lang || '中文'}</button>`
+        )
+        .join('');
       main.innerHTML =
-        `<a class="wb-item-title" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="在新标签打开前台文章页">${escapeHtml(p.title || '(无标题)')}</a>
+        `<a class="wb-item-title" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="在新标签打开前台文章页">${escapeHtml(rep.title || '(无标题)')}</a>
          <span class="wb-item-meta">
-           <span class="wb-badge ${p.published ? 'is-live' : 'is-draft'}">${p.published ? '已发布' : '草稿'}</span>
+           <span class="wb-badge ${rep.published ? 'is-live' : 'is-draft'}">${rep.published ? '已发布' : '草稿'}</span>
            <span class="wb-date">${d}</span>
-           <span class="wb-badge">${LANGS[p.lang] || p.lang || '中文'}</span>
-           <span class="wb-author">${escapeHtml(p.author || site.author || '')}</span>
+           <span class="wb-item-langs">${langTags}</span>
+           <span class="wb-author">${escapeHtml(rep.author || site.author || '')}</span>
          </span>`;
 
-      // 右侧操作区：编辑在上、删除在下
+      main.querySelectorAll('.wb-item-lang').forEach((b) => {
+        b.onclick = () => {
+          const v = versions.find((x) => String(x.id) === b.dataset.id);
+          if (v) openEditor(v);
+        };
+      });
+
+      // 右侧操作区：编辑打开代表版（中文优先，其他语言点语言标签）；删除仅删代表版
       const acts = document.createElement('div');
       acts.className = 'wb-item-acts';
 
@@ -1014,19 +1065,20 @@ export const prerender = true;
       edit.type = 'button';
       edit.className = 'wb-item-edit';
       edit.textContent = '编辑';
-      edit.title = '在编辑器中打开修改';
-      edit.onclick = () => openEditor(p);
+      edit.title = versions.length > 1 ? '打开中文版（其他语言请点左侧语言标签）' : '在编辑器中打开修改';
+      edit.onclick = () => openEditor(rep);
 
       const del = document.createElement('button');
       del.type = 'button';
       del.className = 'wb-item-del';
       del.textContent = '删除';
-      del.title = '删除这篇文章';
+      del.title = versions.length > 1 ? '仅删除中文版，其他语言版本不受影响' : '删除这篇文章';
       del.onclick = async () => {
-        if (!confirm('确定删除《' + (p.title || '无标题') + '》？此操作不可恢复。')) return;
-        const { error } = await supabase.from('posts').delete().eq('id', p.id);
+        const tip = versions.length > 1 ? '（中文版）' : '';
+        if (!confirm('确定删除《' + (rep.title || '无标题') + '》' + tip + '？此操作不可恢复。')) return;
+        const { error } = await supabase.from('posts').delete().eq('id', rep.id);
         if (error) { alert('删除失败：' + error.message); return; }
-        if (state.id === p.id) setForm({});
+        if (versions.some((p) => p.id === state.id)) setForm({});
         await loadList();
       };
 
@@ -1308,6 +1360,17 @@ export const prerender = true;
         if (id === 'f-title') updateSlugHint();
         saveLocalDraft();
       });
+    });
+    // 发布时间：改动即存草稿；选了晚于当前的时间时提示「无定时发布，仅影响展示/排序」
+    $('f-published-at').addEventListener('change', (e) => {
+      const v = e.target.value;
+      const hint = $('published-at-hint');
+      if (v && new Date(v).getTime() > Date.now() + 60_000) {
+        hint.textContent = '该时间晚于当前：未启用定时发布，文章仍会立即上线，此时间仅影响展示与排序';
+      } else {
+        hint.textContent = '修改已发布文章的展示与排序时间；留空则保持原时间';
+      }
+      saveLocalDraft();
     });
     // 分类下拉 / 新建分类输入
     $('f-category').addEventListener('change', () => {

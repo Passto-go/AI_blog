@@ -7,7 +7,7 @@ import { translateArticle } from '../../lib/translate.js';
 export const prerender = false;
 
 // 内存限流：每用户 60 秒 8 次。Worker 实例级，防手滑连点足够；
-// 也顺带避开 Gemini 免费层每分钟请求数的上限。真正的访问门槛是
+// 也顺带避开免费层每分钟请求数的上限。真正的访问门槛是
 // 「只有管理员能登录后台」这一事实。
 const hits = new Map<string, number[]>();
 function rateLimit(key: string, max = 8, windowMs = 60_000): boolean {
