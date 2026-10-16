@@ -1,6 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { getAllPosts, getCategories, renderMarkdown, findTranslation } from '../../lib/posts.js';
+import { getAllPosts, getCategories, renderMarkdown, findTranslation, baseSlug } from '../../lib/posts.js';
 import { useTranslations, localizePath, languages } from '../../i18n/ui.js';
 import { formatDate } from '../../lib/format.js';
 import { readingMinutes } from '../../lib/reading-time.js';
@@ -24,6 +24,9 @@ const wordCount = (post.content || '').replace(/\s+/g, '').length;
 const readMinutes = readingMinutes(post.content);
 const idx = allPosts.findIndex((p) => p.slug === post.slug);
 const pagePath = localizePath(`/posts/${post.slug}/`, lang);
+// 基准 slug（去掉 -en/-ja 语言后缀）：用于给正文容器打「文章身份」标记，
+// 使仅针对某一篇文章的样式规则在它的所有语言版本上一致生效。
+const postBaseSlug = baseSlug(post.slug);
 // 分享需要绝对地址（社交平台不接受相对路径）
 const shareUrl = Astro.site ? new URL(pagePath, Astro.site).href : pagePath;
 const prevPost = idx > 0 ? allPosts[idx - 1] : null;
@@ -104,7 +107,8 @@ const missingNotice = (() => {
         </aside>
       )}
       {post.excerpt && <p class="post-lead">{post.excerpt}</p>}
-      <div class="content" set:html={html} />
+      {/* data-post：暴露文章基准 slug，供「仅对指定文章生效」的样式/脚本作用域钩子使用 */}
+      <div class="content" data-post={postBaseSlug} set:html={html} />
       <Share lang={lang} url={shareUrl} title={post.title} />
       <Comments lang={lang} page={pagePath} />
       <p class="back"><a href={localizePath('/', lang)}>{t('post.back')}</a></p>
@@ -142,5 +146,22 @@ const missingNotice = (() => {
     window.addEventListener('scroll', upd, { passive: true });
     window.addEventListener('resize', upd);
     upd();
+  })();
+
+  // 单篇文章表格铺满：把表格包进滚动容器，让 display:table + width:100% 生效
+  // （display:table 的元素自身无法横向滚动，宽表交给外层 wrapper）。
+  // 仅在带 data-post="vacation_cost-of-japan" 的正文容器内执行，其他文章不受影响。
+  (function () {
+    var scope = document.querySelector('.content[data-post="vacation_cost-of-japan"]');
+    if (!scope) return;
+    var tables = scope.querySelectorAll('table');
+    for (var i = 0; i < tables.length; i++) {
+      var t = tables[i];
+      if (t.parentNode && t.parentNode.classList && t.parentNode.classList.contains('wb-table-scroll')) continue;
+      var wrap = document.createElement('div');
+      wrap.className = 'wb-table-scroll';
+      t.parentNode.insertBefore(wrap, t);
+      wrap.appendChild(t);
+    }
   })();
 </script>

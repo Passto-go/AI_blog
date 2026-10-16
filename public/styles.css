@@ -296,6 +296,38 @@ a { color: inherit; }
 .content tbody tr:nth-child(2n) td { background: var(--bg); }
 .content table th[align="right"], .content table td[align="right"] { text-align: right; }
 .content table th[align="center"], .content table td[align="center"] { text-align: center; }
+
+/* ---------------------------------------------------------------------------
+   单篇覆盖：正文表格铺满内容区（仅 vacation_cost-of-japan 这一篇，含其 en/ja 版本）
+   默认规则让窄表收缩到内容宽（fit-content），观感更紧凑；这篇账单类文章列少、
+   希望表格铺满以对齐阅读区，故在其作用域内覆盖。
+   要点：display:block 是为宽表横向滚动而设，但它会让 width:100% 作用于外层块盒，
+   内层表盒仍按内容收缩（即「外框全宽、列挤左侧」）。因此这里必须把 display 还原为
+   table（改由外层 wrapper 承担滚动——见下方 .wb-table-scroll），并配合
+   table-layout:auto 让列宽按内容比例分配，才能既铺满又不产生畸形列宽。
+   --------------------------------------------------------------------------- */
+.content[data-post="vacation_cost-of-japan"] table {
+  display: table;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: visible;
+  table-layout: auto;
+}
+/* display:table 后自身不再滚动，长内容可能顶破容器：用外层包裹承担横向滚动。
+   仅在该文章下由脚本包裹，避免影响其他文章。 */
+.content[data-post="vacation_cost-of-japan"] .wb-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  margin: 1.4em 0;
+}
+.content[data-post="vacation_cost-of-japan"] .wb-table-scroll > table {
+  margin: 0;
+}
+/* 铺满后单元格获得更宽的可用宽度，适当增加内边距提升账单类表格可读性 */
+.content[data-post="vacation_cost-of-japan"] th,
+.content[data-post="vacation_cost-of-japan"] td {
+  padding: 10px 14px;
+}
 .back { margin-top: 32px; }
 .back a { color: var(--accent); text-decoration: none; }
 
