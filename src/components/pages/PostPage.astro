@@ -69,7 +69,7 @@ const missingNotice = (() => {
   };
 })();
 ---
-<Base lang={lang} title={post.title} description={post.excerpt || ''} langHrefs={langHrefs}>
+<Base lang={lang} title={post.title} description={post.excerpt || ''} langHrefs={langHrefs} image={post.cover || ''} type="article">
   <div class="reading-bar" aria-hidden="true"><div class="reading-bar-fill" id="reading-fill"></div></div>
   <div class="post-head">
     <div class="post-head-inner">

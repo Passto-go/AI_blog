@@ -9,6 +9,8 @@ const {
   description = '',
   bodyClass = '',
   langHrefs = null,
+  image = '',
+  type = 'website',
 } = Astro.props;
 
 const t = useTranslations(lang);
@@ -25,6 +27,12 @@ const altFor = (l) => (langHrefs && langHrefs[l]) || localizePath(basePath, l);
 const zhHref = altFor('zh');
 const enHref = altFor('en');
 const jaHref = altFor('ja');
+
+// ---- 社交分享（Open Graph / Twitter Card）----
+// 抓取器只认「绝对 URL」的图片地址；未指定时回退到站点默认分享图
+const ogImage = image
+  ? (image.startsWith('http') ? image : Astro.site ? new URL(image, Astro.site).href : image)
+  : Astro.site ? new URL('/og-default.png', Astro.site).href : '/og-default.png';
 ---
 <!doctype html>
 <html lang={languages[lang].htmlLang}>
@@ -57,6 +65,19 @@ const jaHref = altFor('ja');
     <link rel="alternate" hreflang="x-default" href={zhHref} />
 
     <link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml" />
+
+    <!-- 社交分享卡片：Facebook/微博/微信(部分)/Discord 等读 og:*，Twitter 读 twitter:* -->
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:type" content={type} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={desc} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={desc} />
+    <meta name="twitter:image" content={ogImage} />
+
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body class={bodyClass}>
