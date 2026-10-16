@@ -211,52 +211,56 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       <!-- ============ 模块三：其他功能 ============ -->
       <section id="mod-misc" class="wb-module" hidden>
         <div class="wb-grid-misc">
-          <div class="wb-card" id="cd-card">
-            <div class="wb-side-head"><strong>首页倒计时</strong></div>
-            <label class="wb-field">名称<input id="cd-name" placeholder="如：元旦" /></label>
-            <label class="wb-field">日期<input id="cd-date" type="date" /></label>
-            <button id="cd-save" class="btn" type="button">保存倒计时</button>
-            <span id="cd-msg" class="wb-hint"></span>
-          </div>
-
-          <div class="wb-card" id="ex-card">
-            <div class="wb-side-head"><strong>摘要自动生成</strong></div>
-            <p class="wb-hint wb-cat-note">发布时若摘要留空，按下列设置从正文自动截取；列表卡片、搜索、RSS、分享卡片均使用该摘要。</p>
-            <label class="wb-field">长度上限
-              <select id="ex-maxlen">
-                <option value="100">100 字</option>
-                <option value="150">150 字</option>
-                <option value="200">200 字（推荐）</option>
-                <option value="300">300 字</option>
-              </select>
-            </label>
-            <label class="wb-field">AI 生成风格
-              <select id="ex-style">
-                <option value="plain">陈述式（客观概括）</option>
-                <option value="points">要点式（信息密度优先）</option>
-                <option value="hook">悬念式（引发兴趣）</option>
-              </select>
-            </label>
-            <button id="ex-save" class="btn" type="button">保存设置</button>
-            <span id="ex-msg" class="wb-hint"></span>
-          </div>
-
-          <div class="wb-card" id="cat-card">
-            <div class="wb-side-head">
-              <strong>分类管理</strong>
-              <span id="cat-count" class="wb-hint"></span>
+          <div class="wb-misc-col">
+            <div class="wb-card" id="ex-card">
+              <div class="wb-side-head"><strong>摘要自动生成</strong></div>
+              <p class="wb-hint wb-cat-note">发布时若摘要留空，按下列设置从正文自动截取；列表卡片、搜索、RSS、分享卡片均使用该摘要。</p>
+              <label class="wb-field">长度上限
+                <select id="ex-maxlen">
+                  <option value="100">100 字</option>
+                  <option value="150">150 字</option>
+                  <option value="200">200 字（推荐）</option>
+                  <option value="300">300 字</option>
+                </select>
+              </label>
+              <label class="wb-field">AI 生成风格
+                <select id="ex-style">
+                  <option value="plain">陈述式（客观概括）</option>
+                  <option value="points">要点式（信息密度优先）</option>
+                  <option value="hook">悬念式（引发兴趣）</option>
+                </select>
+              </label>
+              <button id="ex-save" class="btn" type="button">保存设置</button>
+              <span id="ex-msg" class="wb-hint"></span>
             </div>
-            <p class="wb-hint wb-cat-note">重命名会同步修改该分类下所有文章的分类名与 URL（slug）；改名后旧的分类链接将失效。合并/删除同理会同步文章。</p>
-            <button id="cat-add-btn" class="wb-cat-add" type="button">＋ 新增分类</button>
-            <ul id="cat-list-manage" class="wb-list"></ul>
-            <div id="cat-add-box" class="wb-cat-new wb-cat-new--manage" hidden>
-              <input id="cat-add-name" class="wb-cat" placeholder="显示名，如：技术随笔" />
-              <input id="cat-add-slug" class="wb-cat" placeholder="slug（留空自动生成，仅小写字母/数字/连字符）" />
-              <span id="cat-add-preview" class="wb-cat-slug-preview"></span>
-              <span class="wb-hint wb-cat-new-hint">名称＝前台显示的分类名；Slug＝网址里的英文后缀（仅小写字母/数字/-）。</span>
-              <button id="cat-add-save" class="wb-cat-act" type="button">保存</button>
-              <button id="cat-add-cancel" class="wb-cat-act wb-cat-cancel" type="button">取消</button>
-              <span id="cat-add-msg" class="wb-cat-rename-msg"></span>
+
+            <div class="wb-card" id="cd-card">
+              <div class="wb-side-head"><strong>首页倒计时</strong></div>
+              <label class="wb-field">名称<input id="cd-name" placeholder="如：元旦" /></label>
+              <label class="wb-field">日期<input id="cd-date" type="date" /></label>
+              <button id="cd-save" class="btn" type="button">保存倒计时</button>
+              <span id="cd-msg" class="wb-hint"></span>
+            </div>
+          </div>
+
+          <div class="wb-misc-col">
+            <div class="wb-card" id="cat-card">
+              <div class="wb-side-head">
+                <strong>分类管理</strong>
+                <span id="cat-count" class="wb-hint"></span>
+              </div>
+              <p class="wb-hint wb-cat-note">重命名会同步修改该分类下所有文章的分类名与 URL（slug）；改名后旧的分类链接将失效。合并/删除同理会同步文章。</p>
+              <button id="cat-add-btn" class="wb-cat-add" type="button">＋ 新增分类</button>
+              <ul id="cat-list-manage" class="wb-list"></ul>
+              <div id="cat-add-box" class="wb-cat-new wb-cat-new--manage" hidden>
+                <input id="cat-add-name" class="wb-cat" placeholder="显示名，如：技术随笔" />
+                <input id="cat-add-slug" class="wb-cat" placeholder="slug（留空自动生成，仅小写字母/数字/连字符）" />
+                <span id="cat-add-preview" class="wb-cat-slug-preview"></span>
+                <span class="wb-hint wb-cat-new-hint">名称＝前台显示的分类名；Slug＝网址里的英文后缀（仅小写字母/数字/-）。</span>
+                <button id="cat-add-save" class="wb-cat-act" type="button">保存</button>
+                <button id="cat-add-cancel" class="wb-cat-act wb-cat-cancel" type="button">取消</button>
+                <span id="cat-add-msg" class="wb-cat-rename-msg"></span>
+              </div>
             </div>
           </div>
         </div>

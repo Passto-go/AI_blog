@@ -1232,8 +1232,11 @@ a { color: inherit; }
 .wb-module { animation: wb-fade .15s ease; }
 @keyframes wb-fade { from { opacity: 0; } to { opacity: 1; } }
 
-/* 其他功能：倒计时 + 分类 两栏 */
+/* 其他功能：两栏 —— 左列（摘要设置 + 倒计时 垂直堆叠），右列（分类管理）
+   原先 1fr 1fr 直接铺三个子元素，会把「摘要设置」和「倒计时」并排放成一行、
+   把「分类管理」挤到第二行；现改为两列各放一个列容器，列内自然垂直排列。 */
 .wb-grid-misc { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.wb-misc-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 @media (max-width: 720px) { .wb-grid-misc { grid-template-columns: 1fr; } }
 
 /* 分类管理 */
