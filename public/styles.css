@@ -290,8 +290,10 @@ a { color: inherit; }
   background: var(--code-bg);
   color: var(--text-strong);
   font-weight: 600;
-  /* 不再 nowrap：短表头仍单行，长表头换行而非强行撑宽列 */
-  white-space: normal;
+  /* nowrap：表头撑住列宽，宽表（列多/内容长）恢复横向滚动而非压缩换行。
+     窄表不受影响（fit-content 本就贴合内容宽）；
+     铺满作用域（下方 data-post 覆盖）内恢复 normal，长表头仍可换行。 */
+  white-space: nowrap;
 }
 .content tbody tr:nth-child(2n) td { background: var(--bg); }
 .content table th[align="right"], .content table td[align="right"] { text-align: right; }
@@ -322,6 +324,11 @@ a { color: inherit; }
 }
 .content[data-post="vacation_cost-of-japan"] .wb-table-scroll > table {
   margin: 0;
+}
+/* 铺满作用域内表头恢复可换行：该文章表头较长（如「账面金额合计（人民币列）」
+   在数据列），nowrap 会把窄表撑到超宽触发滚动，违背「铺满」的初衷 */
+.content[data-post="vacation_cost-of-japan"] thead th {
+  white-space: normal;
 }
 /* 铺满后单元格获得更宽的可用宽度，适当增加内边距提升账单类表格可读性 */
 .content[data-post="vacation_cost-of-japan"] th,
