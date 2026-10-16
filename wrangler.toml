@@ -12,12 +12,13 @@ account_id = "2cc5e3ce9320936d151487ce230e8344"
 [assets]
 directory = "./dist"
 
-# 一键翻译（后台 /api/translate 调用）：走 OpenAI 兼容端点指向 Google Gemini。
-# 免费层额度即可满足个人博客用量。
+# 一键翻译（后台 /api/translate 调用）：走 OpenAI 兼容端点，当前指向智谱 GLM
+# （GLM-4.7-Flash 为模型级永久免费，个人博客用量足够；换服务只改下面两个值即可，
+#  代码零改动——任何 OpenAI 兼容服务均可，如 DeepSeek / Moonshot / Gemini）。
 # TRANSLATE_API_KEY 是敏感项，不写在本文件：
 #   Cloudflare 后台 → 本项目 → Settings → Variables and Secrets
-#   → Add → Type 选 Secret → Name: TRANSLATE_API_KEY → Value: AIza...
+#   → Add → Type 选 Secret → Name: TRANSLATE_API_KEY → Value: 智谱 API key
 #   → 保存后 Deployments 里 Retry deployment 生效（secret 仅在服务端可见，不会下发浏览器）。
 [vars]
-TRANSLATE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
-TRANSLATE_MODEL = "gemini-3.8-flash"
+TRANSLATE_BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
+TRANSLATE_MODEL = "glm-4.7-flash"
