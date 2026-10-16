@@ -431,8 +431,15 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       }
       $('f-excerpt').value = result.excerpt || '';
       saveLocalDraft();
-      hint.textContent = `✓ 已填入（${(result.excerpt || '').length} 字），请检查后随文章一起保存`;
-      hint.dataset.kind = 'ok';
+      if (result.source === 'local') {
+        // 服务端在 AI 不可用时回退到本地截取：明确告诉用户这是降级结果，
+        // 不是静默塞一段看起来像 AI 输出的文字。
+        hint.textContent = `⚠ AI 暂不可用（${result.reason || '服务异常'}），已按正文自动截取 ${(result.excerpt || '').length} 字，可直接使用或手动修改`;
+        hint.dataset.kind = 'warn';
+      } else {
+        hint.textContent = `✓ 已填入（${(result.excerpt || '').length} 字），请检查后随文章一起保存`;
+        hint.dataset.kind = 'ok';
+      }
     } catch (e) {
       hint.textContent = '网络错误：' + (e?.message || '请求失败');
       hint.dataset.kind = 'err';

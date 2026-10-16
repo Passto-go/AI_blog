@@ -252,6 +252,18 @@ export async function chat({ baseUrl, apiKey, model, messages, maxTokens = 8192,
   let status = 0;
   let lastDetail = '';
 
+  // ---------------------------------------------------------------------------
+  // 空返回（content 为空）的自愈：推理型模型的「思考预算吃光答案」问题
+  // ---------------------------------------------------------------------------
+  // 智谱 GLM-4.x-Flash / DeepSeek-R 等推理模型会先在 message.reasoning_content
+  // 里思考，而 max_tokens 是「思考 + 回答」的**共享总预算**，不是只给答案的。
+  // 预算不足时它们**不报错**：HTTP 200、content 为 ""、finish_reason 为 "length"
+  // （实测 glm-4.7-flash 的 reasoning_content 可长到 1300~1600 字符，
+  //  给 1024 会在思考阶段就耗尽，答案一个字都写不出来）。
+  // 判据：content 为空 + finish_reason === 'length' → 是预算不足，不是端点故障。
+  // 对策：把 max_tokens 翻倍重试（最多 3 次），通常第一次翻倍即可拿到答案。
+  const budgetRetries = [maxTokens * 2, maxTokens * 4, maxTokens * 8];
+
   for (let attempt = 0; ; attempt++) {
     let resp = await doFetch(payload);
 
@@ -267,9 +279,39 @@ export async function chat({ baseUrl, apiKey, model, messages, maxTokens = 8192,
 
     if (resp.ok) {
       const data = await resp.json();
-      const text = data?.choices?.[0]?.message?.content;
-      if (!text) throw new Error('翻译服务返回为空');
-      return text;
+      const choice = data?.choices?.[0];
+      const msg = choice?.message;
+      const text = msg?.content;
+      if (text) return text;
+
+      // —— 走到这里说明 content 为空，区分「预算不足」与「真的没内容」——
+      const finish = choice?.finish_reason;
+      const reasoning = typeof msg?.reasoning_content === 'string' ? msg.reasoning_content : '';
+      const truncated = finish === 'length';
+
+      if (truncated && budgetRetries.length) {
+        const next = budgetRetries.shift();
+        payload.max_tokens = next;
+        console.warn(
+          `[chat] 响应被 max_tokens 截断（content 为空，reasoning ${reasoning.length} 字符），` +
+            `预算提升至 ${next} 重试`
+        );
+        continue;
+      }
+
+      // 预算已翻到上限仍拿不到答案：给出能指向问题本身的错误，而不是笼统的「返回为空」
+      if (truncated) {
+        throw new Error(
+          `模型思考耗尽了输出预算（已提升至 ${payload.max_tokens} tokens 仍不足）。` +
+            `请改用非推理模型，或调低摘要长度后重试`
+        );
+      }
+      if (reasoning) {
+        throw new Error(
+          `模型只返回了思考过程、没有返回答案（reasoning_content ${reasoning.length} 字符）。请重试`
+        );
+      }
+      throw new Error(`模型返回了空内容（finish_reason: ${finish || '未知'}）。请重试`);
     }
 
     status = resp.status;

@@ -573,6 +573,7 @@ a { color: inherit; }
 .wb-excerpt-row .btn { flex: none; white-space: nowrap; padding: 7px 12px; font-size: 13px; }
 #excerpt-hint[data-kind="err"] { color: var(--danger, #cf222e); }
 #excerpt-hint[data-kind="ok"] { color: var(--accent); }
+#excerpt-hint[data-kind="warn"] { color: #b26a00; }
 #ex-card .btn { margin-top: 12px; width: 100%; }
 #ex-card select {
   padding: 8px 10px; font-size: 13.5px; font-family: inherit;

@@ -227,7 +227,11 @@ export async function aiExcerpt({ title, content, lang = 'zh', maxLen = 200, sty
     apiKey,
     model: env.TRANSLATE_MODEL || 'deepseek-chat',
     messages,
-    maxTokens: 1024,
+    // 推理型模型（如智谱 glm-4.7-flash）会先输出 reasoning_content，
+    // max_tokens 是「思考 + 答案」的共享预算。给 1024 会被思考吃光、
+    // 导致 content 为空且 finish_reason=length；这里留足冗余，
+    // chat() 内部还有「截断则翻倍预算重试」的兜底。
+    maxTokens: 4096,
     temperature: 0.4,
   });
   const obj = extractJSON(raw);

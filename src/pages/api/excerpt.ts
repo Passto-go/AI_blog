@@ -88,7 +88,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     try {
       const env = (locals as any).runtime?.env || {};
       const result = await aiExcerpt({ title, content, lang, maxLen, style }, env);
-      return json({ ok: true, ...result });
+      return json({ ok: true, ...result, source: 'ai' });
     } catch (e: any) {
       if (e?.code === 'NO_API_KEY') {
         return json(
@@ -96,8 +96,28 @@ export const POST: APIRoute = async ({ request, locals }) => {
           503
         );
       }
-      console.error('[excerpt] failed:', e?.message || e);
-      return json({ error: '摘要生成失败：' + (e?.message || '未知错误') }, 502);
+      // AI 不可用时不留空白：回退到本地规则截取，并在响应里标明来源，
+      // 前台据此提示「已按正文自动截取」。这样模型/网络异常都不会阻塞写作。
+      console.error('[excerpt] AI 生成失败，回退本地截取:', e?.message || e);
+      try {
+        const { localExcerpt } = await import('../../lib/excerpt.js');
+        const fallback = localExcerpt(content, maxLen);
+        if (fallback) {
+          return json({ ok: true, excerpt: fallback, source: 'local', reason: e?.message || '未知错误' });
+        }
+      } catch (e2: any) {
+        console.error('[excerpt] 本地截取也失败:', e2?.message || e2);
+      }
+      // 连本地截取都拿不到（正文过短）时，才如实报错，并说明下一步怎么做
+      return json(
+        {
+          error:
+            'AI 摘要生成失败：' +
+            (e?.message || '未知错误') +
+            '。可稍后重试，或手动填写摘要',
+        },
+        502
+      );
     }
   } catch (e: any) {
     console.error('[excerpt] unhandled:', e?.stack || e);
