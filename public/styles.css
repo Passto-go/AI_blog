@@ -561,6 +561,24 @@ a { color: inherit; }
 }
 .wb-more-body input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
+/* 摘要字段：输入框 + AI 生成按钮 同一行 */
+.wb-more-field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.wb-excerpt-row { display: flex; gap: 8px; align-items: center; }
+.wb-excerpt-row input {
+  flex: 1; min-width: 0;
+  padding: 8px 10px; font-size: 13.5px; font-family: inherit;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--text);
+}
+.wb-excerpt-row input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.wb-excerpt-row .btn { flex: none; white-space: nowrap; padding: 7px 12px; font-size: 13px; }
+#excerpt-hint[data-kind="err"] { color: var(--danger, #cf222e); }
+#excerpt-hint[data-kind="ok"] { color: var(--accent); }
+#ex-card .btn { margin-top: 12px; width: 100%; }
+#ex-card select {
+  padding: 8px 10px; font-size: 13.5px; font-family: inherit;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text);
+}
+
 /* 操作区 */
 .wb-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
 .btn-danger {

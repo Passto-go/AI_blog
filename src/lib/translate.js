@@ -48,12 +48,19 @@ ${glossaryText(targetLang)}
 - content 是完整 Markdown 字符串，字符串内的换行必须写成 \\n 转义，双引号写成 \\" 转义。`;
 }
 
-function buildUserPrompt(title, excerpt, content, targetLang, partInfo) {
+function buildUserPrompt(title, excerpt, content, targetLang, partInfo, contextTail) {
   const parts = [];
   if (partInfo) {
     parts.push(
       `【长文分段翻译】本文较长，分 ${partInfo.total} 段发送，当前是第 ${partInfo.index} 段。` +
         `只翻译当前这一部分，保持这部分原有的全部结构与顺序；不要重复翻译其他部分，也不要添加承上启下的过渡句。`
+    );
+  }
+  // 上文参考：仅用于理解「如前所述」这类跨段指代与保持术语一致，明确禁止翻译
+  if (contextTail) {
+    parts.push(
+      `【上文参考】以下是上一段原文的结尾（仅用于理解指代关系与术语一致性，绝对不要翻译、不要复述、不要纳入输出）：\n` +
+        `……${contextTail}`
     );
   }
   parts.push(
@@ -67,38 +74,132 @@ function buildUserPrompt(title, excerpt, content, targetLang, partInfo) {
 }
 
 // 按二级标题（## ）把正文切成若干段；尽量在阈值内合并小段，减少上下文断裂。
+// 结构感知版（v2）：代码围栏与表格绝不从中间腰斩——
+//   · 代码块：整块进出（拆散的代码无法翻译也无法还原）
+//   · 表格：整表进出；单表超阈值时按行切，且每片都重复表头+分隔行，
+//     使每一片自身就是一张合法表格（修复 v1 把 12 列大表切成
+//     「| PT |」这类 15 字残片、拼接后一张表碎成四张的问题）
+//   · 超长段落：在句界处切，不切断句子
 export function splitContent(content, maxChars = SINGLE_SHOT_MAX_CHARS) {
-  const text = String(content || '');
-  if (text.length <= maxChars) return [text];
+  const lines = String(content || '').split('\n');
+  if (lines.join('\n').length <= maxChars) return [String(content || '')];
 
-  const lines = text.split('\n');
+  // ---- 1) 分块：围栏 / 表格 / 散文 ----
+  const blocks = [];
+  let prose = [];
+  const flushProse = () => { if (prose.length) { blocks.push({ type: 'prose', lines: prose }); prose = []; } };
+
+  let i = 0;
+  while (i < lines.length) {
+    const t = lines[i].trim();
+    const fence = t.match(/^(`{3,}|~{3,})/);
+    if (fence) {
+      // 找到配对闭合行；未闭合则不当围栏（草稿写了一半，按散文处理）
+      const marker = fence[1];
+      let close = -1;
+      for (let j = i + 1; j < lines.length; j++) {
+        const tj = lines[j].trim();
+        if (tj.startsWith(marker[0].repeat(3)) && tj.length >= 3) { close = j; break; }
+      }
+      if (close !== -1) {
+        flushProse();
+        blocks.push({ type: 'fence', text: lines.slice(i, close + 1).join('\n') });
+        i = close + 1;
+        continue;
+      }
+    }
+    if (t.startsWith('|')) {
+      // 连续表格行（含缩进表格）
+      let j = i;
+      while (j < lines.length && lines[j].trim().startsWith('|')) j++;
+      flushProse();
+      blocks.push({ type: 'table', lines: lines.slice(i, j) });
+      i = j;
+      continue;
+    }
+    prose.push(lines[i]);
+    i++;
+  }
+  flushProse();
+
+  // ---- 2) 打包进 chunk ----
   const chunks = [];
   let cur = [];
   let curLen = 0;
-
-  const flush = () => {
-    if (cur.length) {
-      chunks.push(cur.join('\n'));
-      cur = [];
-      curLen = 0;
-    }
+  const flush = () => { if (cur.length) { chunks.push(cur.join('\n')); cur = []; curLen = 0; } };
+  const push = (text) => {
+    if (curLen && curLen + text.length + 1 > maxChars) flush();
+    cur.push(text);
+    curLen += text.length + 1;
+    if (curLen >= maxChars) flush();
   };
 
-  for (const line of lines) {
-    // 在二级标题处切分；标题之前的部分若已达阈值也先落地
-    if (/^##\s/.test(line) && curLen > maxChars * 0.5) flush();
-    cur.push(line);
-    curLen += line.length + 1;
-    if (curLen >= maxChars) flush();
+  for (const b of blocks) {
+    if (b.type === 'fence') { push(b.text); continue; }
+    if (b.type === 'table') {
+      if (b.lines.join('\n').length <= maxChars) { push(b.lines.join('\n')); continue; }
+      // 超大表：按行切，每片重复表头与分隔行。
+      // 关键：分片必须走 push() 统一入队——直接 chunks.push() 会把
+      // 尚未落地的前文（cur）甩到表格后面，造成整篇内容顺序错乱。
+      const header = b.lines[0];
+      const sep = b.lines[1] && /^\s*\|?[\s:|-]+\|?\s*$/.test(b.lines[1]) ? b.lines[1] : null;
+      const rows = b.lines.slice(sep ? 2 : 1);
+      const headBlock = sep ? header + '\n' + sep : header;
+      let piece = [headBlock];
+      let pieceLen = headBlock.length;
+      const emitPiece = () => { push(piece.join('\n')); piece = [headBlock]; pieceLen = headBlock.length; };
+      for (const row of rows) {
+        if (pieceLen + row.length + 1 > maxChars && piece.length > (sep ? 2 : 1)) emitPiece();
+        if (row.length > maxChars) {
+          // 单行就超限（超长单元格）：硬切，每片仍带表头
+          for (let k = 0; k < row.length; k += maxChars) {
+            const seg = row.slice(k, k + maxChars);
+            if (pieceLen + seg.length + 1 > maxChars && piece.length > (sep ? 2 : 1)) emitPiece();
+            piece.push(seg); pieceLen += seg.length + 1;
+          }
+          continue;
+        }
+        piece.push(row);
+        pieceLen += row.length + 1;
+      }
+      if (piece.length > (sep ? 2 : 1)) emitPiece();
+      continue;
+    }
+    // 散文：逐行推进，标题处优先切；超长行按句界切
+    for (const line of b.lines) {
+      if (/^##\s/.test(line) && curLen > maxChars * 0.5) flush();
+      if (line.length + 1 > maxChars) {
+        flush();
+        for (const seg of sliceAtSentence(line, maxChars)) push(seg);
+        continue;
+      }
+      push(line);
+    }
   }
   flush();
 
-  // 兜底：某一段（如超长无标题段落）仍超限，按句子硬切
+  // 兜底：极端情况下仍超限的 chunk（如单个超大代码块），保持原样——
+  // 拆散代码块比超预算更糟，交给模型按「原样保留」规则处理。
+  return chunks.length ? chunks : [String(content || '')];
+}
+
+/** 把超长无标点行按句界（中英日句末标点）切成 ≤ max 的片 */
+function sliceAtSentence(text, max) {
   const out = [];
-  for (const c of chunks) {
-    if (c.length <= maxChars) { out.push(c); continue; }
-    for (let i = 0; i < c.length; i += maxChars) out.push(c.slice(i, i + maxChars));
+  let rest = text;
+  while (rest.length > max) {
+    const win = rest.slice(0, max);
+    const m = [...win.matchAll(/[。！？；!?;]/g)];
+    let cut = m.length ? m[m.length - 1].index + 1 : -1;
+    if (cut < max * 0.5) cut = -1;          // 句界太靠前则不用
+    if (cut === -1) {
+      const sp = win.lastIndexOf(' ');
+      cut = sp > max * 0.6 ? sp : max;
+    }
+    out.push(rest.slice(0, cut));
+    rest = rest.slice(cut);
   }
+  if (rest) out.push(rest);
   return out;
 }
 
@@ -131,7 +232,9 @@ export function normalizeTranslation(obj) {
 }
 
 // OpenAI 兼容协议调用（DeepSeek / OpenAI / Moonshot / 智谱 / Gemini 兼容端点均可）。
-async function chat({ baseUrl, apiKey, model, messages, maxTokens = 8192, temperature = 0.3 }) {
+// 导出供摘要生成（src/lib/excerpt.js）复用——两处共用同一套退避重试与容错，
+// 避免复制粘贴两份逻辑后行为漂移。
+export async function chat({ baseUrl, apiKey, model, messages, maxTokens = 8192, temperature = 0.3 }) {
   const url = String(baseUrl || 'https://api.deepseek.com').replace(/\/+$/, '') + '/chat/completions';
   const payload = { model, messages, max_tokens: maxTokens, temperature };
   const doFetch = (body) =>
@@ -186,6 +289,15 @@ async function chat({ baseUrl, apiKey, model, messages, maxTokens = 8192, temper
   throw new Error(msg);
 }
 
+// 并发度：2 路。段与段无数据依赖（每段自带上文原文参考），可安全并行；
+// 2 路足以把 5 段从 ~233s 压到 ~140s（落在前端 200s 超时线内），
+// 又不至于并发太高踩中免费层 RPM 限流。
+const TRANSLATE_CONCURRENCY = 2;
+const TRANSLATE_BATCH_GAP_MS = 1500;
+// 送给模型的「上文参考」长度：压住「如前所述」这类跨段指代与术语漂移。
+// 取**原文**尾部而非译文——译文要等上一段返回，会重新引入串行依赖。
+const CONTEXT_TAIL_CHARS = 400;
+
 // 翻译一篇（或一段）文章。env 提供 OpenAI 兼容端点配置。
 export async function translateArticle({ title, excerpt, content, targetLang }, env) {
   if (!['en', 'ja'].includes(targetLang)) {
@@ -200,18 +312,28 @@ export async function translateArticle({ title, excerpt, content, targetLang }, 
 
   const chunks = splitContent(content);
   const multi = chunks.length > 1;
-  const results = [];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  for (let i = 0; i < chunks.length; i++) {
-    // 段间间隔 2 秒：避免多段请求瞬间打出踩中供应商 RPM 限流（免费层尤其敏感）
-    if (i > 0) await sleep(2000);
+  // 摘要兜底：原文没填摘要时，模型「根据正文生成」只会看到自己那一段，
+  // 导致 results[0].excerpt 只概括开头（修复：先用本地截取算出全文摘要，
+  // 再作为「给定摘要」交给每一段翻译，各段译的是同一份全文摘要）。
+  let excerptForPrompt = String(excerpt || '').trim();
+  if (multi && !excerptForPrompt) {
+    try {
+      const { localExcerpt } = await import('./excerpt.js');
+      excerptForPrompt = localExcerpt(content, 200);
+    } catch { /* 摘要库缺失不阻断翻译 */ }
+  }
+
+  const translatePart = async (i) => {
     const partInfo = multi ? { index: i + 1, total: chunks.length } : null;
+    // 上文参考：上一段原文的尾部，明确标注「不要翻译」
+    const contextTail = i > 0 ? chunks[i - 1].slice(-CONTEXT_TAIL_CHARS) : '';
     const messages = [
       { role: 'system', content: buildSystemPrompt(targetLang) },
       {
         role: 'user',
-        content: buildUserPrompt(title, excerpt, chunks[i], targetLang, partInfo),
+        content: buildUserPrompt(title, excerptForPrompt, chunks[i], targetLang, partInfo, contextTail),
       },
     ];
     const raw = await chat({
@@ -220,7 +342,18 @@ export async function translateArticle({ title, excerpt, content, targetLang }, 
       model: env.TRANSLATE_MODEL || 'deepseek-chat',
       messages,
     });
-    results.push(normalizeTranslation(extractJSON(raw)));
+    return normalizeTranslation(extractJSON(raw));
+  };
+
+  // 分批并发。任一一段失败 → Promise.all 整体 reject → 调用方抛错，
+  // 不返回半成品译文（原子性：数据库里绝不会出现译了一半的文章）。
+  const results = new Array(chunks.length);
+  for (let i = 0; i < chunks.length; i += TRANSLATE_CONCURRENCY) {
+    const batch = [];
+    for (let k = i; k < Math.min(i + TRANSLATE_CONCURRENCY, chunks.length); k++) batch.push(k);
+    const rs = await Promise.all(batch.map((k) => translatePart(k)));
+    batch.forEach((k, idx) => { results[k] = rs[idx]; });
+    if (i + TRANSLATE_CONCURRENCY < chunks.length) await sleep(TRANSLATE_BATCH_GAP_MS);
   }
 
   if (results.length === 1) return { ...results[0], parts: 1 };
