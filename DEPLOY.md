@@ -2,7 +2,7 @@
 
 > 站点为 Astro SSR：内容页（首页/文章/分类/归档/RSS/sitemap/搜索索引）每请求现查 Supabase，
 > **后台发布文章后即时生效，无需重新构建**。读者始终只访问 Cloudflare，不直连 Supabase。
-> 代码仓库：https://github.com/Passto-go/styleblog_V2.0 （分支 `main`）
+> 代码仓库：https://github.com/<你的用户名>/<仓库名> （分支 `main`）
 >
 > ⚠️ 本项目是 **Cloudflare Workers（通过 Git 构建，即 Workers Builds）**，不是经典 Pages。
 > Dashboard 的 Deploy command 为 `npx wrangler deploy`，由仓库根目录的 `wrangler.toml` 驱动。
@@ -30,7 +30,7 @@
 
 1. Cloudflare Dashboard → **Workers & Pages → Overview → Create → Connect to Git**
    - 注意：选 **Workers**（不是 Pages 标签）。Workers 现在原生支持静态资源 + Git 构建。
-2. 授权 GitHub，选择仓库 `Passto-go/styleblog_V2.0`，Production branch 选 `main`
+2. 授权 GitHub，选择仓库 `<你的用户名>/<仓库名>`，Production branch 选 `main`
 3. 构建设置（Framework preset 选 **Astro** 后通常自动填好）：
    - Framework preset：**Astro**
    - Build command：**npm run build**
@@ -40,7 +40,7 @@
 
    | 变量 | 值 | 必填 |
    |---|---|---|
-   | `PUBLIC_SUPABASE_URL` | `https://wgqdqbstibhojmrfhtmg.supabase.co` | 是 |
+   | `PUBLIC_SUPABASE_URL` | `https://xxxx.supabase.co` | 是 |
    | `PUBLIC_SUPABASE_ANON_KEY` | `eyJ...` 那串 anon public key | 是 |
    | `PUBLIC_SITE_URL` | `https://<项目名>.workers.dev` | 建议 |
    | `NODE_VERSION` | `22` | 建议（仓库已有 `.nvmrc`，双保险） |
@@ -77,12 +77,26 @@ directory = "./dist"
 - 评论原本就是 realtime 动态，不受影响
 - 下架文章同样即时（`published=false` 后下一请求即消失）
 
-## 四、自定义域名（eu.org 批下来后）
+## 四、自定义域名（自有域名签发后）
 
-1. Workers 项目 → **Settings → Triggers → Custom Domains → Add Custom Domain** → 填 `mystyle.eu.org`
+### 4.0 先把域名接入 Cloudflare（新版控制台路径）
+
+> 旧版入口「Websites → Add a site」已改名为 **「Domains → Onboard a domain」**（2025 年控制台改版），找不到 Websites 入口是正常的。
+
+1. Cloudflare Dashboard 左侧边栏 → **Domains** → 右上角 **Onboard a domain**（部分账号显示 Add a domain）
+2. 输入 apex 域名（如 `example.com`）→ Continue
+3. DNS 记录导入：新域名选跳过/自己管理 → Continue
+4. 套餐选 **Free** → Continue → 记录确认页直接 Continue（空区域正常）
+5. CF 给出两个 NS（`xxx.ns.cloudflare.com`）→ 到注册商处把域名 NS 改为这两个
+   - 阿里云：进**域名控制台**（domain.aliyun.com，不是云解析 DNS）→ 域名列表 → 管理 → 左侧菜单 **DNS 修改** → 修改 DNS 服务器 → 填 CF 的两个 NS
+6. 等 CF 面板 Domains 列表里域名状态变为 **Active**（通常几分钟到几小时）
+
+### 4.1 绑定到 Worker
+
+1. Workers 项目 → **Settings → Triggers → Custom Domains → Add Custom Domain**（新版界面在 Settings → Domains & Routes）→ 填 `<你的域名>`（示例：`example.com`）
 2. DNS 在 Cloudflare 则自动配置；在别处则加 `CNAME` 指向 `<项目名>.workers.dev`
 3. SSL 自动签发
-4. 把 **Build environment variables** 里的 `PUBLIC_SITE_URL` 改成 `https://mystyle.eu.org`，**重新部署一次**
+4. 把 **Build environment variables** 里的 `PUBLIC_SITE_URL` 改成 `https://example.com`，**重新部署一次**（Deployments 页最新部署 → `···` → Retry deployment；或推送任意代码触发 Git 自动构建）
    （RSS/sitemap/canonical 随之更新；文章内容不受影响）
 
 ## 五、上线后验证清单

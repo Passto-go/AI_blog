@@ -1,7 +1,7 @@
 import { getAllPosts } from '../lib/posts.js';
 
 export async function GET(context) {
-  const base = context.site || new URL('https://your-domain.com');
+  const base = context.site || new URL('https://example.com');
   const staticPages = [
     '/', '/about/', '/categories/', '/archive/', '/search/',
     '/en/', '/en/about/', '/en/categories/', '/en/archive/', '/en/search/',
