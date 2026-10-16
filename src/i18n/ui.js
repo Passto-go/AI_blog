@@ -43,7 +43,7 @@ export const ui = {
     'about.title': '关于',
     'about.lead': '你好，我是老一贯。',
     'about.body':
-      '这里记录我的日常：跑步、生活，以及一些零散的观察和想法。\n\n不追热点，不刻意更新，只写当下真正想写的东西。文章以中文为主，也提供英文版本，方便海外的朋友阅读。\n\n## 为什么叫“吾道一以贯之”？\n\n出自《论语·里仁》——子曰：“参乎！吾道一以贯之。”曾子曰：“唯。”孔子对曾参说：我的道，用一个东西贯穿始终；曾参答：是。后来曾子解释为“忠恕而已矣”。\n\n内容板块可以是：读书笔记、思想随笔；也可以是个人成长、长期主义；还可以是自己摸索学习的心路历程。\n\n## 到底是什么？\n\n一个普通人的长期主义；读书、思考、写下去；不追热点，只写主线；忠恕而已；做自己。',
+      '这里记录我的日常：跑步、生活，以及一些零散的观察和想法。\n\n不追热点，不刻意更新，只写当下真正想写的东西。文章以中文为主，也提供英文/日语版本，方便海外的朋友阅读。\n\n## **为什么网站名称叫“吾道一以贯之”？**\n\n出自《论语·里仁》——子曰：“参乎！吾道一以贯之。”曾子曰：“唯。”孔子对曾参说：我的道，用一个东西贯穿始终；曾参答：是。后来曾子解释为“忠恕而已矣”。\n\n所以，我认为“一如既往”这个词用来形容是比较贴切的。当然，这看起来有些抽象。\n\n## **到底是什么？**\n\n一个普通人的长期主义；读书、思考、写下去；不追热点，只写主线；忠恕而已；做自己。\n\n## **内容有什么？**\n\n读书笔记、思想随笔、个人成长、长期主义以及自己摸索学习的心路历程。\n\n## **有关我自己：**\n\n男性，90后，已成为**中年**，大学本科经贸类专业，不过并没有在这个行业深耕。IT相关并不是我的优势，甚至对我来说一无所知，但我有很大的兴趣。\n\n2018年一个偶然的机会，我接触到了 [GitHub](https://github.com)，于是新世界的大门被打开了。我在 GitHub 上发现了很多开源的优秀项目，那是我第一次认为自身能力需要提升。对于我这种 I 人而言，更喜欢独自在自己的世界里遨游。自从30岁之后，便不断在 INTJ-A 和 ENTJ-A 反复切换。但这并不影响什么。\n\n后来当我第一次在 GitHub 上找到一个比较适合自己的博客项目，我跟着 README 描述，在本地电脑一步一步操作，最终成功复现项目并在本地运行，非常激动。因为在这个过程中 Linux 语言，DOS 命令，以及错误日志，对于我来讲无疑是天书。解决问题虽然花费了不少时间，但过程中增长了不少知识。\n\n于是当我第一次在 [阿里云](https://aliyun.com) 自购域名和服务器，薅着免费的云存储和 CDN，成功在服务器上完成了部署，并且实现了 IP+端口访问的时候，我觉得有极大兴趣继续坚持下去。因监管需要，在完成工信部 ICP 和公安网安双备案之后，这个网站终于成功上云。因成本原因，在5年后，我关闭了网站，注销了备案。而此刻（2026年10月），在 AI 发展日趋成熟的今天，我也再次借助 AI 的力量，再次完成了属于自己的个人网站。\n\n传统的个人网站主要是 [WordPress](https://wordpress.org/) 或者 [Hexo](https://hexo.io/) 作为老大哥，但这些对我来讲，并不契合我的需求。项目代码放在 GitHub 上，用 [Cloudflare](https://www.cloudflare.com/) 托管，加上 [Supabase](https://supabase.com/) 免费数据库，前端是一个静态的网页，后端管理页面可以直接新建文章发布，对于我来说是最方便的。基于此，借助 AI 也成功搭建。对于一个访问量级不庞大的个人网站而言，这些免费的均已足够。\n\n**一如既往，一以贯之。**',
 
     'categories.title': '分类',
     'categories.intro': '按主题浏览全部文章。',
@@ -70,6 +70,7 @@ export const ui = {
     'post.hot': '热门文章',
     'post.catDir': '分类目录',
     'post.words': '约 {n} 字',
+    'post.readTime': '约 {n} 分钟读完',
 
     'share.title': '分享这篇文章',
     'share.copy': '复制链接',
@@ -166,7 +167,7 @@ export const ui = {
     'about.title': 'About',
     'about.lead': "Hi, I'm 老一贯.",
     'about.body':
-      'This is where I keep my everyday notes: running, life, and scattered observations and thoughts.\n\nNo chasing trends, no forced schedule — I only write what I actually want to write. Posts are mainly in Chinese, with English versions for friends abroad.\n\n## Why “吾道一以贯之” (One Thread Through It All)?\n\nFrom the Analects, Book IV (Li Ren) — Confucius said, “Shen! My way is bound together by one single thread.” Master Zeng replied, “Yes.” Confucius meant that the whole of his way is strung upon one thing; Zeng later explained it as “loyalty and reciprocity (zhong shu), that is all.”\n\nThe content can be reading notes or reflective essays; it can also be personal growth, long-termism, or the winding path of learning something on my own.\n\n## So what is it, really?\n\nAn ordinary person’s long-termism: read, think, keep writing; don’t chase trends, just follow the main thread; loyalty and reciprocity; be yourself.',
+      'This is where I keep my everyday notes: running, life, and scattered observations and thoughts.\n\nNo chasing trends, no forced schedule — I only write what I actually want to write. Posts are mainly in Chinese, with English and Japanese versions for friends abroad.\n\n## **Why is the site called “吾道一以贯之” (One Thread Through It All)?**\n\nFrom the Analects, Book IV (Li Ren) — Confucius said, “Shen! My way is bound together by one single thread.” Master Zeng replied, “Yes.” Confucius told Zeng Shen that his way runs through everything by means of one thing; Zeng answered that it was so. Zeng later explained it as “loyalty and reciprocity (zhong shu), that is all.”\n\nSo I think the phrase “一如既往” (yī rú jì wǎng — just as always) describes it rather aptly. Of course, it still sounds a little abstract.\n\n## **So what is it, really?**\n\nAn ordinary person’s long-termism: read, think, keep writing; don’t chase trends, just follow the main thread; loyalty and reciprocity; be yourself.\n\n## **What’s in here?**\n\nReading notes, reflective essays, personal growth, long-termism, and the winding record of figuring things out on my own.\n\n## **About me:**\n\nMale, born in the ’90s, now middle-aged. I majored in economics and trade at university, but never went deep into that field. IT was never my strength — I even knew nothing about it at all — but I have a deep interest in it.\n\nIn 2018, by a chance encounter, I came across [GitHub](https://github.com), and a door to a new world swung open. On GitHub I found many excellent open-source projects — the first time I felt my own abilities needed to improve. As an introvert (an “I” person), I prefer roaming alone in my own world. Since turning 30, I have kept switching back and forth between INTJ-A and ENTJ-A. None of it really matters, though.\n\nLater, when I first found a blog project on GitHub that suited me, I followed the README, step by step on my local machine, and finally got it reproduced and running locally — I was thrilled. In the process, the Linux shell, DOS commands, and error logs were all gibberish to me. Solving problems took a lot of time, but I picked up plenty of knowledge along the way.\n\nSo when I first bought a domain and server of my own from [Alibaba Cloud](https://aliyun.com), scraping by on free cloud storage and a CDN, and finally completed the deployment and got the site accessible via IP + port, I felt a strong urge to keep at it. As required by regulation, after completing the dual filings — the MIIT ICP filing and the public security network security filing — the site finally went live on the cloud. Because of the costs, five years later I shut the site down and cancelled the filings. And now, in October 2026, with AI maturing day by day, I have once again built a personal website of my own with the help of AI.\n\nTraditional personal websites are mainly built on [WordPress](https://wordpress.org/) or [Hexo](https://hexo.io/) as the old guards, but neither really fits my needs. The code lives on GitHub, hosted by [Cloudflare](https://www.cloudflare.com/), plus a free database from [Supabase](https://supabase.com/). The frontend is a static page, and the backend admin page lets me create and publish posts directly — the most convenient setup for me. On that basis, I built it successfully with AI’s help. For a personal site without massive traffic, all these free tiers are more than enough.\n\n**As always. One thread through it all.**',
 
     'categories.title': 'Categories',
     'categories.intro': 'Browse all posts by topic.',
@@ -193,6 +194,7 @@ export const ui = {
     'post.hot': 'Popular',
     'post.catDir': 'Categories',
     'post.words': '~{n} words',
+    'post.readTime': '~{n} min read',
 
     'share.title': 'Share this post',
     'share.copy': 'Copy link',
@@ -289,7 +291,7 @@ export const ui = {
     'about.title': 'About',
     'about.lead': 'こんにちは、老一贯です。',
     'about.body':
-      'ここには僕の日常——ランニング、暮らし、ちょっとした観察や想い——を綴ります。\n\n流行は追わず、無理に更新もしません。今ほんとうに書きたいことだけを書く。記事は中国語が中心で、海外の友だちのために英語版も用意しています。\n\n## なぜ「吾道一以貫之（吾が道は一以て之を貫く）」なのか\n\n『論語』里仁篇より——子曰く、「参や、吾が道は一以て之を貫く。」曾子曰く、「唯。」孔子は曾参に、自分の道はたったひとつのもので貫かれている、と説いた。曾子はのちにそれを「忠恕のみ」と解した。\n\nコンテンツは読書ノートや思想エッセイ、あるいは個人の成長、長期主義、自分で手探りに学んでいく心の軌跡でもあります。\n\n## 結局、何なのか\n\n一人の普通の人の長期主義。読み、考え、書き続ける。流行は追わず、ただ本筋を書く。忠恕のみ。自分らしくあること。',
+      'ここには僕の日常——ランニング、暮らし、ちょっとした観察や想い——を綴ります。\n\n流行は追わず、無理に更新もしません。今ほんとうに書きたいことだけを書く。記事は中国語が中心で、海外の友だちのために英語版と日本語版も用意しています。\n\n## **なぜサイト名は「吾道一以貫之（吾が道は一以て之を貫く）」なのか**\n\n『論語』里仁篇より——子曰く、「参や、吾が道は一以て之を貫く。」曾子曰く、「唯。」孔子は曾参に、自分の道はひとつのものですべてを貫いている、と語った。曾子はそれに応えた。のちに曾子はそれを「忠恕のみ」と解した。\n\nだから、「一如既往（いつもの通り、昔からずっと変わらず）」という言葉をあてるのは、なかなかふさわしいと思う。もちろん、まだ少し抽象的ではあるけれど。\n\n## **結局、何なのか**\n\n一人の普通の人の長期主義。読み、考え、書き続ける。流行は追わず、ただ本筋を書く。忠恕のみ。自分らしくあること。\n\n## **何が書いてあるのか**\n\n読書ノート、思想エッセイ、個人の成長、長期主義、そして自分で手探りに学んでいく心の軌跡。\n\n## **僕について：**\n\n男性、90年代生まれ、今や中年に差し掛かった。大学では経済貿易系の学部に通っていたが、この業界を深く究めたわけではない。ITは僕の得意分野ではなく、それどころか何ひとつ知らなかったが、とても大きな興味がある。\n\n2018年のある偶然のきっかけで、[GitHub](https://github.com) に触れ、新世界への扉が開いた。GitHub 上には優れたオープンソースプロジェクトがたくさんあり、自分の能力を上げる必要があると初めて感じた。僕のような I 人間（内向型）にとっては、自分の世界でひとり漂う方が好きだ。30歳を過ぎてからは、INTJ-A と ENTJ-A のあいだを往復している。だが、それが何かに影響するわけではない。\n\nその後、GitHub で自分に合いそうなブログプロジェクトを初めて見つけたとき、README の手順に従い、ローカルのパソコンで一歩ずつ操作し、ついにプロジェクトを再現してローカルで動かすことに成功して、とても興奮した。この過程で、Linux のシェル、DOS コマンド、エラーログは、僕にとってまさに天書だった。問題解決には時間がかかったが、その分たくさんの知識が増えた。\n\nそこで、[阿里云](https://aliyun.com)（Alibaba Cloud）で初めて自前のドメインとサーバーを購入し、無料のクラウドストレージと CDN を利用しながら、サーバー上へのデプロイを完了し、IP+ポートでのアクセスを実現したとき、この活動を続けていきたいという強い思いを抱いた。規制の要件に従い、工業情報化部の ICP 备案と公安の網安备案を完了したのち、このサイトはついにクラウド上で公開された。コストの都合により、5年後にサイトを閉じ、备案を注销した。そして今（2026年10月）、AI が日ごとに成熟するなかで、再び AI の力で自分だけの個人サイトを完成させた。\n\n従来の個人サイトは主に [WordPress](https://wordpress.org/) や [Hexo](https://hexo.io/) が長老として君臨しているが、僕のニーズには合わない。コードは GitHub に置き、[Cloudflare](https://www.cloudflare.com/) でホストし、[Supabase](https://supabase.com/) の無料データベースを加える。フロントエンドは静的ページで、バックエンドの管理画面から直接記事を作成・公開できる——僕にとって最も便利な構成だ。これを基に、AI の助けも借りて無事に構築できた。アクセス規模の大きくない個人サイトにとって、これらの無料枠は十分すぎる。\n\n**いつもの通り。吾が道は一以て之を貫く。**',
 
     'categories.title': 'カテゴリ',
     'categories.intro': 'テーマ別にすべての記事を眺める。',
@@ -316,6 +318,7 @@ export const ui = {
     'post.hot': '人気記事',
     'post.catDir': 'カテゴリ',
     'post.words': '約 {n} 文字',
+    'post.readTime': '約 {n} 分で読めます',
 
     'share.title': 'この記事をシェア',
     'share.copy': 'リンクをコピー',

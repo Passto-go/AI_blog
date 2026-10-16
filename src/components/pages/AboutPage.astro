@@ -4,6 +4,24 @@ import { useTranslations } from '../../i18n/ui.js';
 
 const { lang } = Astro.props;
 const t = useTranslations(lang);
+
+// HTML 转义，防止正文内容被当作标签注入
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// 行内语法：**粗体** → <strong>，[文字](网址) → <a>；先整体转义再做替换，保证安全
+function inline(s) {
+  return escapeHtml(s)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+}
+
 // 按空行切段；以「## 」开头的段落渲染为二级小标题，其余为正文段落
 const blocks = t('about.body')
   .split('\n\n')
@@ -17,7 +35,7 @@ const blocks = t('about.body')
     <h1 class="page-title">{t('about.title')}</h1>
     <p class="lead">{t('about.lead')}</p>
     <div class="prose">
-      {blocks.map((b) => (b.tag === 'h2' ? <h2>{b.text}</h2> : <p>{b.text}</p>))}
+      {blocks.map((b) => (b.tag === 'h2' ? <h2 set:html={inline(b.text)} /> : <p set:html={inline(b.text)} />))}
     </div>
   </section>
 </Base>

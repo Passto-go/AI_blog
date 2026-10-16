@@ -85,12 +85,12 @@ a { color: inherit; }
   transition: color .15s, background .15s;
 }
 .theme-toggle:hover { color: var(--accent); background: var(--surface-2); }
+/* 登录入口：仅图标（与主题切换按钮同形态，hover 变色） */
 .login-link {
-  font-size: 13px; font-weight: 600; color: var(--text);
-  text-decoration: none; border: 1px solid var(--border);
-  border-radius: 999px; padding: 4px 12px; transition: all .15s;
+  color: #6b7280; display: inline-flex; padding: 3px; border-radius: 8px;
+  transition: color .15s, background .15s;
 }
-.login-link:hover { border-color: var(--accent); color: var(--accent); }
+.login-link:hover { color: var(--accent); background: var(--surface-2); }
 /* 主题切换图标：亮色态显示月亮（点它变夜）、暗色态显示太阳 */
 .theme-toggle .i-sun { display: none; }
 [data-theme="dark"] .theme-toggle .i-moon { display: none; }
@@ -207,6 +207,9 @@ a { color: inherit; }
 .prose p { margin: 1.1em 0; }
 .prose h2 { font-size: 19px; margin: 1.9em 0 0.5em; color: var(--text-strong); line-height: 1.4; }
 .prose h2:first-child { margin-top: 0; }
+.prose a { color: var(--accent); text-decoration: none; }
+.prose a:hover { text-decoration: underline; }
+.prose strong { font-weight: 600; color: var(--text-strong); }
 .crumbs { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
 .crumbs a { color: var(--muted); text-decoration: none; }
 .crumbs a:hover { color: var(--accent); }
@@ -541,6 +544,10 @@ a { color: inherit; }
 [data-theme="dark"] .wb-badge.is-live { color: #3fb950; border-color: #1f4f2b; background: #12261a; }
 [data-theme="dark"] .wb-badge.is-draft { color: #d29922; border-color: #4d3d17; background: #241d0f; }
 .wb-date { font-size: 11px; color: var(--muted); }
+/* 文章列表：语言版本标签（同篇文章多语言合并为一行，点击载入对应版本） */
+.wb-item-langs { display: inline-flex; gap: 4px; }
+.wb-item-lang { font: inherit; font-size: 11px; line-height: 1; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px 8px; cursor: pointer; }
+.wb-item-lang:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 .wb-author { font-size: 11px; color: var(--muted); }
 .wb-author::before { content: '作者 '; opacity: .75; }
 .wb-author-input {
