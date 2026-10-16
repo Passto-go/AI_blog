@@ -49,6 +49,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       <!-- 模块导航：文章管理 / 评论管理 / 其他功能 -->
       <nav class="wb-modnav" id="wb-modnav">
         <button type="button" data-mod="write" class="on">文章管理</button>
+        <button type="button" data-mod="files">文件管理</button>
         <button type="button" data-mod="comments">评论管理</button>
         <button type="button" data-mod="misc">其他功能</button>
       </nav>
@@ -95,9 +96,9 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               </div>
 
               <div class="wb-toolbar">
-                <label class="wb-upload" title="上传图片到 Supabase 存储并插入正文">
-                  插图
-                  <input id="f-image" type="file" accept="image/*" multiple hidden />
+                <label class="wb-upload" title="上传图片插入正文，或上传附件（Word/PPT/Excel/PDF 等）插入下载链接">
+                  插入文件
+                  <input id="f-image" type="file" accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.zip" multiple hidden />
                 </label>
                 <span id="upload-msg" class="wb-hint"></span>
               </div>
@@ -150,7 +151,40 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         </div>
       </section>
 
-      <!-- ============ 模块二：评论管理 ============ -->
+      <!-- ============ 模块二：文件管理 ============ -->
+      <section id="mod-files" class="wb-module" hidden>
+        <div class="wb-card" id="fm-card">
+          <div class="wb-side-head">
+            <strong>文件管理</strong>
+            <span id="fm-count" class="wb-hint"></span>
+          </div>
+          <p class="wb-hint wb-cat-note">
+            这里管理所有已上传的图片与附件。删除文章时会自动清理其名下文件；
+            「孤儿文件」指已上传但没有任何文章引用它们（含上传后未插入正文的情况），可一键清理。
+          </p>
+
+          <div class="wb-fm-actions">
+            <label class="btn wb-upload">
+              上传文件
+              <input id="fm-upload-input" type="file" multiple hidden />
+            </label>
+            <button id="fm-clean-orphans" class="btn btn-ghost" type="button">清理孤儿文件</button>
+            <button id="fm-refresh" class="btn btn-ghost" type="button">刷新</button>
+            <span id="fm-msg" class="wb-hint"></span>
+          </div>
+
+          <div class="wb-filter" id="fm-filter">
+            <button type="button" data-f="all" class="on">全部</button>
+            <button type="button" data-f="images">图片</button>
+            <button type="button" data-f="attachments">附件</button>
+            <button type="button" data-f="orphan">孤儿文件</button>
+          </div>
+          <input id="fm-search" class="wb-search" type="search" placeholder="搜索文件名或所属文章…" />
+          <ul id="fm-list" class="wb-list wb-fm-list"></ul>
+        </div>
+      </section>
+
+      <!-- ============ 模块三：评论管理 ============ -->
       <section id="mod-comments" class="wb-module" hidden>
         <div class="wb-card" id="cm-card">
           <div class="wb-side-head">
@@ -262,7 +296,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   }
 
   // ---------- 模块切换（文章管理 / 评论管理 / 其他功能） ----------
-  const MODULES = ['write', 'comments', 'misc'];
+  const MODULES = ['write', 'files', 'comments', 'misc'];
   function switchModule(name) {
     if (!MODULES.includes(name)) return;
     closeEditor(); // 切换模块时收起编辑器弹窗，避免遮罩/滚动锁残留
@@ -271,6 +305,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       b.classList.toggle('on', b.dataset.mod === name);
     });
     if (name === 'comments') loadComments();
+    if (name === 'files') loadMedia();
     if (name === 'misc') { loadCountdown(); loadCatManage(); }
   }
 
@@ -301,7 +336,172 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     else { msg.textContent = '已保存 ✓ 首页刷新即生效'; msg.dataset.kind = 'ok'; }
   }
 
-  // ---------- 评论管理（管理员：可读/改/删全部评论） ----------
+  // ---------- 文件管理 ----------
+  const fmState = { filter: 'all', query: '' };
+  let allMedia = [];
+  let orphanPaths = new Set();
+
+  function fmtSize(n) {
+    if (!n) return '0 B';
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+
+  async function loadMedia() {
+    const ul = $('fm-list');
+    if (!ul) return;
+    ul.innerHTML = '<li class="wb-empty">加载中…</li>';
+    // 1) 读归属记录（登录用户可见）
+    const { data, error } = await supabase.from('media').select('*').order('created_at', { ascending: false });
+    if (error) {
+      ul.innerHTML = '<li class="wb-empty">读取失败：' + error.message +
+        '<br>（若提示表不存在，请先执行 supabase/media_library.sql）</li>';
+      return;
+    }
+    allMedia = data || [];
+
+    // 2) 读孤儿清单（视图 media_orphans；失败则降级为「按正文引用即时判定」）
+    try {
+      const { data: orph } = await supabase.from('media_orphans').select('path');
+      orphanPaths = new Set((orph || []).map((x) => x.path));
+    } catch {
+      const { data: posts } = await supabase.from('posts').select('content');
+      const blob = (posts || []).map((p) => p.content || '').join('\n');
+      orphanPaths = new Set(allMedia.filter((m) => !blob.includes(m.path)).map((m) => m.path));
+    }
+    // 视图可能因「media 无记录但 storage 有文件」而漏判，补一轮正文引用核对
+    if (allMedia.length) {
+      const { data: posts } = await supabase.from('posts').select('content');
+      const blob = (posts || []).map((p) => p.content || '').join('\n');
+      allMedia.forEach((m) => { if (!blob.includes(m.path)) orphanPaths.add(m.path); });
+    }
+    renderMedia();
+  }
+
+  function renderMedia() {
+    const ul = $('fm-list');
+    ul.innerHTML = '';
+    const q = fmState.query.trim().toLowerCase();
+    const imgExts = IMAGE_EXTS;
+
+    let rows = allMedia.filter((m) => {
+      if (fmState.filter === 'images' && m.bucket !== 'images') return false;
+      if (fmState.filter === 'attachments' && m.bucket !== 'attachments') return false;
+      if (fmState.filter === 'orphan' && !orphanPaths.has(m.path)) return false;
+      if (q) {
+        const hay = ((m.path || '') + ' ' + (m.original_name || '') + ' ' + (m.post_slug || '')).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    const totalSize = allMedia.reduce((s, m) => s + (Number(m.size_bytes) || 0), 0);
+    $('fm-count').textContent =
+      `${rows.length} 个文件 / 共 ${allMedia.length} 个 · 合计 ${fmtSize(totalSize)} · 孤儿 ${orphanPaths.size} 个`;
+
+    if (!rows.length) {
+      ul.innerHTML = '<li class="wb-empty">没有匹配的文件</li>';
+      return;
+    }
+
+    rows.forEach((m) => {
+      const li = document.createElement('li');
+      li.className = 'wb-item wb-fm-item';
+
+      const thumb = document.createElement('div');
+      thumb.className = 'wb-fm-thumb';
+      const ext = (m.path.match(/\.([a-z0-9]+)$/i) || [])[1] || '';
+      if (m.bucket === 'images') {
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.alt = m.original_name || m.path;
+        img.src = supabase.storage.from('images').getPublicUrl(m.path).data.publicUrl;
+        thumb.appendChild(img);
+      } else {
+        thumb.textContent = (ext || 'FILE').toUpperCase().slice(0, 4);
+        thumb.classList.add('is-ext');
+      }
+
+      const main = document.createElement('div');
+      main.className = 'wb-item-main';
+      const isOrphan = orphanPaths.has(m.path);
+      main.innerHTML =
+        `<span class="wb-fm-name" title="${escapeHtml(m.path)}">${escapeHtml(m.original_name || m.path)}</span>
+         <span class="wb-item-meta">
+           <span class="wb-badge ${m.bucket === 'images' ? 'is-live' : 'is-draft'}">${m.bucket === 'images' ? '图片' : '附件'}</span>
+           ${isOrphan ? '<span class="wb-badge is-trash">未被引用</span>' : ''}
+           <span class="wb-date">${fmtSize(m.size_bytes)}</span>
+           <span class="wb-date">${m.created_at ? new Date(m.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+           <span class="wb-author">${m.post_slug ? escapeHtml(m.post_slug) : '未关联'}</span>
+         </span>`;
+
+      const acts = document.createElement('div');
+      acts.className = 'wb-item-acts';
+
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'wb-item-edit';
+      copy.textContent = '复制链接';
+      copy.onclick = async () => {
+        const u = supabase.storage.from(m.bucket).getPublicUrl(m.path).data.publicUrl;
+        try { await navigator.clipboard.writeText(u); copy.textContent = '已复制'; setTimeout(() => (copy.textContent = '复制链接'), 1200); }
+        catch { prompt('复制此链接：', u); }
+      };
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'wb-item-del';
+      del.textContent = '删除';
+      del.onclick = async () => {
+        if (!confirm('删除文件「' + (m.original_name || m.path) + '」？\n若它仍被文章引用，文章中将出现坏链。')) return;
+        del.disabled = true; del.textContent = '删除中…';
+        const { error: e1 } = await supabase.storage.from(m.bucket).remove([m.path]);
+        if (e1) { alert('删除失败：' + e1.message); del.disabled = false; del.textContent = '删除'; return; }
+        await supabase.from('media').delete().eq('path', m.path);
+        await loadMedia();
+      };
+
+      acts.append(copy, del);
+      li.append(thumb, main, acts);
+      ul.append(li);
+    });
+  }
+
+  // 清理孤儿文件：仅删「media 有记录、正文无引用」的文件，逐个尝试，最后汇总
+  async function cleanOrphans() {
+    const msg = $('fm-msg');
+    const list = allMedia.filter((m) => orphanPaths.has(m.path));
+    if (!list.length) { msg.textContent = '没有孤儿文件 ✓'; return; }
+    if (!confirm(`清理 ${list.length} 个孤儿文件？\n它们未被任何文章引用，删除不可恢复。`)) return;
+    msg.textContent = '清理中…';
+    let done = 0, fail = 0;
+    for (const m of list) {
+      const { error } = await supabase.storage.from(m.bucket).remove([m.path]);
+      if (error) { fail++; continue; }
+      await supabase.from('media').delete().eq('path', m.path);
+      done++;
+    }
+    msg.textContent = `已清理 ${done} 个${fail ? '，失败 ' + fail + ' 个' : ''} ✓`;
+    await loadMedia();
+  }
+
+  // 删除文章时清理其名下文件（供 deletePost 调用；按 base slug 精确匹配）
+  async function purgeMediaForPost(slug) {
+    const base = baseSlug(slug);
+    const { data } = await supabase.from('media').select('path, bucket').eq('post_slug', base);
+    if (!data || !data.length) return { removed: 0, failed: 0 };
+    let removed = 0, failed = 0;
+    for (const m of data) {
+      const { error } = await supabase.storage.from(m.bucket).remove([m.path]);
+      if (error) { failed++; continue; }
+      await supabase.from('media').delete().eq('path', m.path);
+      removed++;
+    }
+    return { removed, failed };
+  }
+
+  // ---------- 评论管理 ----------
   const cmState = { filter: 'all' };
 
   function cmStatusOf(c) {
@@ -1118,8 +1318,13 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         purge.onclick = async () => {
           if (!confirm('彻底删除《' + (rep.title || '无标题') + '》？\n含全部语言版本，此操作不可恢复。')) return;
           purge.disabled = true; purge.textContent = '删除中…';
+          // 先清文件（趁 media 记录还在，按 base slug 精确定位），再删文章本体
+          const fm = await purgeMediaForPost(rep.slug);
           const { error } = await supabase.from('posts').delete().in('id', ids);
           if (error) { alert('删除失败：' + error.message); purge.disabled = false; purge.textContent = '彻底删除'; return; }
+          if (fm.removed || fm.failed) {
+            setMsg(`已删除文章，并清理 ${fm.removed} 个关联文件${fm.failed ? '（' + fm.failed + ' 个失败）' : ''}`, 'ok');
+          }
           if (versions.some((p) => p.id === state.id)) setForm({});
           await loadList();
         };
@@ -1168,9 +1373,17 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     // 依赖 Supabase 侧 purge_expired_posts()（security definer，仅登录用户可调），
     // 由后台加载时触发——免费档无需 Cron/Worker，打开后台即完成清理。
     // 失败不影响列表加载（如尚未执行 posts_trash.sql 时会报函数不存在，静默忽略）。
+    // 关键：先查出即将被删的文章 → 清掉它们的文件 → 再执行 DB 删除，
+    //       否则文章行没了就查不到归属 slug，文件会永久残留。
     try {
+      const cutoff = new Date(Date.now() - TRASH_KEEP_DAYS * 86400000).toISOString();
+      const { data: expired } = await supabase.from('posts')
+        .select('slug').not('deleted_at', 'is', null).lt('deleted_at', cutoff);
+      if (expired && expired.length) {
+        for (const p of expired) await purgeMediaForPost(p.slug);
+      }
       const { data: purged } = await supabase.rpc('purge_expired_posts', { p_days: TRASH_KEEP_DAYS });
-      if (purged > 0) setMsg(`已自动清理 ${purged} 篇超期文章`, 'ok');
+      if (purged > 0) setMsg(`已自动清理 ${purged} 篇超期文章及其关联文件`, 'ok');
     } catch (e) { /* 函数未部署或网络异常：忽略，不阻塞列表 */ }
 
     const query = supabase
@@ -1318,19 +1531,67 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     return `${Date.now()}-${base || 'image'}.${IMAGE_EXTS.includes(ext) ? ext : 'png'}`;
   }
 
+  // 附件扩展名白名单（与 supabase/media_library.sql 的 allowed_mime_types 对应）
+  const ATTACH_EXTS = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'csv', 'txt', 'md', 'zip'];
+  // 按扩展名判定归属 bucket：图片 → images，其余白名单 → attachments
+  function bucketFor(name) {
+    const ext = (String(name || '').toLowerCase().match(/\.([a-z0-9]{1,8})$/) || [])[1] || '';
+    if (IMAGE_EXTS.includes(ext)) return 'images';
+    if (ATTACH_EXTS.includes(ext)) return 'attachments';
+    return 'images'; // 未知类型按图片处理（保持旧行为）
+  }
+
+  // 生成 storage 路径：时间戳 + ASCII 安全名 + 白名单扩展名（图片与附件通用）
+  function safeUploadPath(name, isImage) {
+    const raw = String(name || '');
+    const ext = (raw.toLowerCase().match(/\.([a-z0-9]{1,8})$/) || [])[1] || '';
+    const base = raw
+      .replace(/\.[a-z0-9]{1,8}$/i, '')
+      .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase().replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+      .replace(/-+/g, '-').replace(/^-|-$/g, '')
+      .slice(0, 40);
+    const allow = isImage ? IMAGE_EXTS : ATTACH_EXTS;
+    const safeExt = allow.includes(ext) ? ext : (isImage ? 'png' : 'bin');
+    return `${Date.now()}-${base || (isImage ? 'image' : 'file')}.${safeExt}`;
+  }
+
+  // 记录文件归属（写 media 表）。失败不阻断上传——文件已传成功，仅少一条索引记录。
+  async function recordMedia({ path, bucket, originalName, mime, size }) {
+    try {
+      await supabase.from('media').upsert({
+        path, bucket,
+        post_slug: state.slug ? baseSlug(state.slug) : null,
+        original_name: originalName || '', mime: mime || '', size_bytes: size || 0,
+      }, { onConflict: 'path' });
+    } catch (e) { console.warn('[admin] media 记录写入失败（不影响上传）', e); }
+  }
+
+  // 上传：图片插 Markdown 图片语法，附件插下载链接。均记录归属。
   async function uploadImages(files) {
     const msg = $('upload-msg');
-    const ok = [];
+    const imgs = [];
+    const atts = [];
     for (const file of files) {
+      const bucket = bucketFor(file.name);
+      const isImg = bucket === 'images';
       msg.textContent = `上传中 ${file.name}…`;
-      const path = safeImagePath(file.name);
-      const { error } = await supabase.storage.from('images').upload(path, file, { upsert: true, contentType: file.type || undefined });
+      const path = safeUploadPath(file.name, isImg);
+      const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true, contentType: file.type || undefined });
       if (error) { msg.textContent = '上传失败：' + error.message; return; }
-      ok.push(supabase.storage.from('images').getPublicUrl(path).data.publicUrl);
+      const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+      await recordMedia({ path, bucket, originalName: file.name, mime: file.type, size: file.size });
+      if (isImg) imgs.push(`![](${publicUrl})`);
+      else atts.push(`[📎 ${file.name}](${publicUrl})`);
     }
-    if (ok.length) {
-      insertAtCursor(ok.map((u) => `![](${u})`).join('\n'));
-      msg.textContent = `已插入 ${ok.length} 张图片 ✓`;
+    const parts = [...imgs, ...atts];
+    if (parts.length) {
+      insertAtCursor(parts.join('\n'));
+      const bits = [];
+      if (imgs.length) bits.push(`${imgs.length} 张图片`);
+      if (atts.length) bits.push(`${atts.length} 个附件`);
+      msg.textContent = `已插入 ${bits.join(' + ')} ✓`;
     }
   }
 
@@ -1402,6 +1663,35 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     // 一键翻译
     $('tr-en-btn').onclick = () => translateTo('en');
     $('tr-ja-btn').onclick = () => translateTo('ja');
+
+    // 文件管理：筛选 / 搜索 / 上传 / 清理 / 刷新
+    $('fm-filter').querySelectorAll('button').forEach((b) => b.onclick = () => {
+      fmState.filter = b.dataset.f;
+      $('fm-filter').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+      renderMedia();
+    });
+    $('fm-search').oninput = (e) => { fmState.query = e.target.value; renderMedia(); };
+    $('fm-refresh').onclick = () => loadMedia();
+    $('fm-clean-orphans').onclick = () => cleanOrphans();
+    $('fm-upload-input').onchange = async (e) => {
+      const files = [...(e.target.files || [])];
+      e.target.value = '';
+      if (!files.length) return;
+      const msg = $('fm-msg');
+      let done = 0;
+      for (const f of files) {
+        msg.textContent = `上传中 ${f.name}…`;
+        const bucket = bucketFor(f.name);
+        const isImg = bucket === 'images';
+        const path = safeUploadPath(f.name, isImg);
+        const { error } = await supabase.storage.from(bucket).upload(path, f, { upsert: true, contentType: f.type || undefined });
+        if (error) { msg.textContent = '上传失败：' + error.message; return; }
+        await recordMedia({ path, bucket, originalName: f.name, mime: f.type, size: f.size });
+        done++;
+      }
+      msg.textContent = `已上传 ${done} 个文件 ✓`;
+      await loadMedia();
+    };
 
     // 评论管理：状态筛选
     $('cm-filter').querySelectorAll('button').forEach((b) => b.onclick = () => {

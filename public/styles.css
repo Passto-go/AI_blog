@@ -315,13 +315,14 @@ a { color: inherit; }
   overflow-x: visible;
   table-layout: auto;
 }
-/* display:table 后自身不再滚动，长内容可能顶破容器：用外层包裹承担横向滚动。
-   仅在该文章下由脚本包裹，避免影响其他文章。 */
-.content[data-post="vacation_cost-of-japan"] .wb-table-scroll {
+/* display:table / 定宽超宽表格通用滚动包裹：由脚本按需包裹表格，
+   承担横向滚动，避免表格把整个页面撑出横向溢出 */
+.wb-table-scroll {
   width: 100%;
   overflow-x: auto;
   margin: 1.4em 0;
 }
+.content[data-post="vacation_cost-of-japan"] .wb-table-scroll { margin: 0; }
 .content[data-post="vacation_cost-of-japan"] .wb-table-scroll > table {
   margin: 0;
 }
@@ -335,6 +336,69 @@ a { color: inherit; }
 .content[data-post="vacation_cost-of-japan"] td {
   padding: 10px 14px;
 }
+
+/* ---------------------------------------------------------------------------
+   消费明细表列宽定制（仅 cost-of-travelling-Japan 这一篇，含其语言版本）
+   Markdown 无法逐列定宽（GFM 只有对齐语法），故在 CSS 层用 table-layout:fixed
+   + nth-child 逐列指定宽度。列序（12 列）：
+     1日期 2消费类别 3消费明细 4日元 5港币 6人民币 7优惠 8实付 9汇率
+     10支付方式 11消费场所 12备注
+   定宽诉求：日期折 2 行、明细 2~3 行、6 个货币/数值列各 6 个数字字符宽。
+   注：fixed 布局下表头不再参与列宽计算，须连同 thead 一起按同序定宽。
+   --------------------------------------------------------------------------- */
+.content[data-post="cost-of-travelling-Japan"] table {
+  table-layout: fixed;
+  /* 各列定宽总和约 850px 超过容器 630px：必须解除 max-width 封顶，
+     否则 fixed 布局把所有列等比压扁（定宽失效）。超出部分走横向滚动。 */
+  width: max-content;
+  max-width: none;
+  min-width: 100%;   /* 定宽之和小于容器时仍铺满 */
+}
+/* 定宽：需覆盖 th（表头行参与 fixed 计算的基准） */
+.content[data-post="cost-of-travelling-Japan"] th:nth-child(1),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(1) { width: 9ch; }   /* 日期：2026-07-28 → 折 2 行 */
+.content[data-post="cost-of-travelling-Japan"] th:nth-child(2),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(2) { width: 5em; }   /* 消费类别 */
+.content[data-post="cost-of-travelling-Japan"] th:nth-child(3),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(3) { width: 13em; }  /* 消费明细：允许 2~3 行 */
+.content[data-post="cost-of-travelling-Japan"] th:nth-child(4),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(4),
+.content[data-post="cost-of-travelling-Japan"] th:nth-child(5),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(5),
+.content[data-post="cost-of-travelling-Japan"] th:nth-child(6),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(6),
+.content[data-post="cost-of-travelling-Japan"] th:nth-child(7),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(7),
+.content[data-post="cost-of-travelling-Japan"] th:nth-child(8),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(8),
+.content[data-post="cost-of-travelling-Japan"] th:nth-child(9),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(9) { width: 78px; }  /* 货币/数值列：实测容纳最长数值 1441.64 不碎行（ch 单位在混合字体下偏窄） */
+.content[data-post="cost-of-travelling-Japan"] th:nth-child(10),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(10) { width: 6em; }  /* 支付方式 */
+.content[data-post="cost-of-travelling-Japan"] th:nth-child(11),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(11) { width: 7em; }  /* 消费场所 */
+.content[data-post="cost-of-travelling-Japan"] th:nth-child(12),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(12) { width: 3.5em; }/* 备注 */
+/* 数值列右对齐（该表未写 GFM 对齐语法，账单类数值右对齐更易比对） */
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(4),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(5),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(6),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(7),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(8),
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(9) { text-align: right; }
+.content[data-post="cost-of-travelling-Japan"] thead th:nth-child(4),
+.content[data-post="cost-of-travelling-Japan"] thead th:nth-child(5),
+.content[data-post="cost-of-travelling-Japan"] thead th:nth-child(6),
+.content[data-post="cost-of-travelling-Japan"] thead th:nth-child(7),
+.content[data-post="cost-of-travelling-Japan"] thead th:nth-child(8),
+.content[data-post="cost-of-travelling-Japan"] thead th:nth-child(9) { text-align: right; }
+/* 定宽后表头不再被 nowrap 撑开，改回可换行让「人民币（CNY）」等自然折行 */
+.content[data-post="cost-of-travelling-Japan"] thead th { white-space: normal; }
+/* 日期列：优先在连字符后断开，得到 2026-07- / 28 的整齐两行 */
+.content[data-post="cost-of-travelling-Japan"] td:nth-child(1) { overflow-wrap: anywhere; }
+/* 单元格内边距略收，为定宽列让出空间 */
+.content[data-post="cost-of-travelling-Japan"] th,
+.content[data-post="cost-of-travelling-Japan"] td { padding: 8px 8px; }
 .back { margin-top: 32px; }
 .back a { color: var(--accent); text-decoration: none; }
 
@@ -590,6 +654,20 @@ a { color: inherit; }
 .wb-item-lang:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 .wb-author { font-size: 11px; color: var(--muted); }
 .wb-author::before { content: '作者 '; opacity: .75; }
+
+/* 文件管理（媒体库） */
+.wb-fm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 4px; }
+.wb-fm-actions .wb-upload { display: inline-flex; align-items: center; }
+.wb-fm-list { margin-top: 10px; }
+.wb-fm-item { align-items: center; }
+.wb-fm-thumb {
+  flex: none; width: 52px; height: 52px; border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--border); background: var(--surface-2);
+  display: flex; align-items: center; justify-content: center; margin-right: 12px;
+}
+.wb-fm-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wb-fm-thumb.is-ext { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .02em; }
+.wb-fm-name { font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere; }
 
 /* 垃圾箱：过滤按钮计数徽标 / 列表行状态 / 剩余保留天数 */
 .wb-filter-badge {
