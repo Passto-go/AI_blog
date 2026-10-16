@@ -657,7 +657,7 @@ a { color: inherit; }
 
 /* 文件管理（媒体库） */
 .wb-fm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 4px; }
-.wb-fm-actions .wb-upload { display: inline-flex; align-items: center; }
+.wb-fm-actions .wb-upload { display: inline-flex; align-items: center; border-style: dashed; }
 .wb-fm-list { margin-top: 10px; }
 .wb-fm-item { align-items: center; }
 .wb-fm-thumb {
