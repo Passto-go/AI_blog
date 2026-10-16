@@ -76,6 +76,7 @@ directory = "./dist"
 - 改错别字同样即时生效
 - 评论原本就是 realtime 动态，不受影响
 - 下架文章同样即时（`published=false` 后下一请求即消失）
+- **修改已发布文章的发布时间**：后台编辑器 →「更多设置」→「发布时间」选新时间保存，前台展示 / 首页归档排序 / RSS `pubDate` 下一请求即更新（留空保存则保持原时间；该时间仅作展示与排序，未启用定时发布）
 
 ## 四、自定义域名（自有域名签发后）
 
@@ -138,5 +139,6 @@ directory = "./dist"
 | 文章发布了但页面没有 | 几乎不可能（无构建环节）；先确认 `published=true` | 访问 `/search-index.json` 看文章在不在 |
 | 页面 404 但文章确实存在 | slug 输错 / 语言不匹配（`/en/posts/` 只列 en 文章） | 从列表页点进去，别手拼 URL |
 | Supabase 临时故障 | 拉取失败会回退示例文章（保留的降级逻辑） | 站点不崩，恢复后自动正常 |
+| sitemap / RSS / canonical 里是错域名 | `PUBLIC_SITE_URL` 没改；或（自建分支）`astro.config.mjs` 在 config 加载期读不到 `.env` | 改 Settings → Builds 的构建变量后 Retry deployment；本仓库已改用 Vite `loadEnv` 显式读取 `.env`（Astro 不会把 `.env` 注入该阶段的 `process.env`） |
 | Worker CPU 超限（免费 10ms/调用） | 超长文 marked 渲染耗时 | 当前文章量级远未触顶；真触顶再加边缘缓存 |
 | 想给动态页加缓存 | 默认无缓存，发布零延迟 | 需要时在响应加 `s-maxage=60`；个人博客当前没必要 |
