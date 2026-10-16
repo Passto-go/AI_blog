@@ -1,12 +1,24 @@
 ---
 import Icon from './Icon.astro';
 import { useTranslations } from '../i18n/ui.js';
+import QRCode from 'qrcode';
 
 const { lang = 'zh', url = '', title = '' } = Astro.props;
 const t = useTranslations(lang);
 
 const u = encodeURIComponent(url);
 const ti = encodeURIComponent(title);
+
+// 微信分享：微信未开放网页直链分享接口（无带参 sharer URL，weixin:// 也无法携带内容），
+// 站外场景唯一成熟路径是二维码——服务端生成本页 URL 的 SVG，读者用微信「扫一扫」打开后
+// 在微信内点右上角分享给朋友/朋友圈。SSR 生成、零客户端依赖、零外网请求。
+let qrDataUri = '';
+if (url) {
+  try {
+    const svg = await QRCode.toString(url, { type: 'svg', errorCorrectionLevel: 'M', margin: 1 });
+    qrDataUri = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  } catch (e) { /* 二维码生成失败时静默降级：弹层不显示图，仅显示文案 */ }
+}
 
 // 各平台分享链接（url/title 已编码）；color 为品牌色，作用于图标（--brand），使图标始终显示品牌色
 const platforms = [
@@ -33,7 +45,7 @@ const platforms = [
       <Icon name="link" size={15} /><span class="share-btn-label">{t('share.copy')}</span>
     </button>
 
-    <button class="share-btn share-wechat" id="share-wechat" type="button" data-url={url} data-hint={t('share.wechatHint')} style="--brand:#07c160">
+    <button class="share-btn share-wechat" id="share-wechat" type="button" aria-expanded="false" aria-controls="share-qr" style="--brand:#07c160">
       <Icon name="wechat" size={15} /><span>{t('share.wechat')}</span>
     </button>
 
@@ -57,6 +69,13 @@ const platforms = [
         style={`--brand:${p.color}`}
       ><Icon name={p.key} size={16} /><span>{p.label}</span></a>
     ))}
+  </div>
+  <div class="share-qr" id="share-qr" hidden>
+    <div class="share-qr-panel" role="dialog" aria-modal="true" aria-label={t('share.wechat')}>
+      <button class="share-qr-close" id="share-qr-close" type="button" aria-label="close">×</button>
+      {qrDataUri && <img class="share-qr-img" id="share-qr-img" src={qrDataUri} alt={t('share.wechat')} width="168" height="168" />}
+      <p class="share-qr-hint">{t('share.wechatHint')}</p>
+    </div>
   </div>
   <div class="share-toast" id="share-toast" role="status" aria-live="polite"></div>
 </section>
@@ -132,13 +151,26 @@ const platforms = [
       });
     }
 
-    // ---- 微信：无网页直链分享，复制链接 + 提示 ----
+    // ---- 微信：无网页直链分享，弹二维码让读者用微信扫一扫打开后分享 ----
     var wxBtn = document.getElementById('share-wechat');
-    if (wxBtn) {
+    var qrEl = document.getElementById('share-qr');
+    var qrClose = document.getElementById('share-qr-close');
+    function closeQr() {
+      if (!qrEl) return;
+      qrEl.hidden = true;
+      if (wxBtn) wxBtn.setAttribute('aria-expanded', 'false');
+    }
+    if (wxBtn && qrEl) {
       wxBtn.addEventListener('click', function () {
-        copyText(wxBtn.getAttribute('data-url') || location.href).then(function (ok) {
-          toast(ok ? wxBtn.getAttribute('data-hint') || '' : '');
-        });
+        qrEl.hidden = false;
+        wxBtn.setAttribute('aria-expanded', 'true');
+      });
+      qrEl.addEventListener('click', function (e) {
+        if (e.target === qrEl) closeQr(); // 点遮罩关闭
+      });
+      if (qrClose) qrClose.addEventListener('click', closeQr);
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeQr();
       });
     }
 
