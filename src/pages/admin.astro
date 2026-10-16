@@ -212,6 +212,14 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       <section id="mod-misc" class="wb-module" hidden>
         <div class="wb-grid-misc">
           <div class="wb-misc-col">
+            <div class="wb-card" id="cd-card">
+              <div class="wb-side-head"><strong>首页倒计时</strong></div>
+              <label class="wb-field">名称<input id="cd-name" placeholder="如：元旦" /></label>
+              <label class="wb-field">日期<input id="cd-date" type="date" /></label>
+              <button id="cd-save" class="btn" type="button">保存倒计时</button>
+              <span id="cd-msg" class="wb-hint"></span>
+            </div>
+
             <div class="wb-card" id="ex-card">
               <div class="wb-side-head"><strong>摘要自动生成</strong></div>
               <p class="wb-hint wb-cat-note">发布时若摘要留空，按下列设置从正文自动截取；列表卡片、搜索、RSS、分享卡片均使用该摘要。</p>
@@ -232,14 +240,6 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               </label>
               <button id="ex-save" class="btn" type="button">保存设置</button>
               <span id="ex-msg" class="wb-hint"></span>
-            </div>
-
-            <div class="wb-card" id="cd-card">
-              <div class="wb-side-head"><strong>首页倒计时</strong></div>
-              <label class="wb-field">名称<input id="cd-name" placeholder="如：元旦" /></label>
-              <label class="wb-field">日期<input id="cd-date" type="date" /></label>
-              <button id="cd-save" class="btn" type="button">保存倒计时</button>
-              <span id="cd-msg" class="wb-hint"></span>
             </div>
           </div>
 
