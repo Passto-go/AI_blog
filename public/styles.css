@@ -520,6 +520,9 @@ a { color: inherit; }
   color: var(--muted); padding: 5px 13px; border-radius: 999px; transition: background .15s, color .15s;
 }
 .wb-seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+/* 语言按钮上的版本状态标记：· 未创建 / ○ 草稿 / ✓ 已发布 */
+.wb-seg button .wb-lang-mark { font-size: 11px; margin-left: 4px; opacity: .75; }
+.wb-seg button.on .wb-lang-mark { opacity: .95; }
 .wb-cat {
   flex: 1; min-width: 140px; padding: 8px 12px; font-size: 14px; font-family: inherit;
   border: 1px solid var(--border); border-radius: 999px; background: var(--bg); color: var(--text);
@@ -631,8 +634,10 @@ a { color: inherit; }
 .wb-langstate-btn.has:hover { background: var(--accent-soft); }
 #tr-msg[data-kind="ok"] { color: #1a7f37; }
 #tr-msg[data-kind="err"] { color: #cf222e; }
+#tr-msg[data-kind="warn"] { color: #b26a00; }
 [data-theme="dark"] #tr-msg[data-kind="ok"] { color: #3fb950; }
 [data-theme="dark"] #tr-msg[data-kind="err"] { color: #f85149; }
+[data-theme="dark"] #tr-msg[data-kind="warn"] { color: #d29922; }
 
 /* 列表列 */
 .wb-side-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }

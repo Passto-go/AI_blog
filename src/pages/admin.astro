@@ -285,7 +285,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   let supabase = null;
 
   // 当前编辑态
-  const state = { id: '', lang: 'zh', status: 'draft', filter: 'all', query: '', saving: false, catSlug: '', catName: '' };
+  const state = { id: '', lang: 'zh', status: 'draft', filter: 'all', query: '', saving: false, catSlug: '', catName: '', dirty: false };
 
   const LANGS = { zh: '中文', en: 'EN', ja: '日本語' };
 
@@ -987,19 +987,17 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   }
 
   // 译文状态行：显示当前文章的英/日版本是否已存在（按 base slug 匹配内存全量表），
-  // 已存在的可点击直接载入该版本。
+  // 已存在的可点击直接载入该版本（与语言按钮同一套判定：langOf + findVersion）。
   function updateLangState() {
     const el = $('lang-state');
     if (!el) return;
     const cur = state.id ? allPosts.find((p) => p.id === state.id) : null;
     const rawSlug = cur?.slug || $('f-slug').value.trim();
     if (!rawSlug) { el.innerHTML = ''; return; }
-    const base = baseSlug(rawSlug);
+    const base = stripLangSuffix(rawSlug);
     const parts = [];
     for (const code of ['en', 'ja']) {
-      const row = allPosts.find(
-        (p) => p.id !== state.id && baseSlug(p.slug) === base && (p.lang || 'zh') === code
-      );
+      const row = findVersion(base, code, state.id);
       parts.push(
         row
           ? `<button type="button" class="wb-langstate-btn has" data-lang="${code}" title="载入${LANGS[code]}版（点击）">${LANGS[code]} ✓</button>`
@@ -1009,11 +1007,35 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     el.innerHTML = parts.join('');
     el.querySelectorAll('button[data-lang]').forEach((b) => {
       b.onclick = () => {
-        const row = allPosts.find(
-          (p) => baseSlug(p.slug) === base && (p.lang || 'zh') === b.dataset.lang
-        );
-        if (row) { setForm(row); setMsg(`已载入《${row.title}》`); }
+        const row = findVersion(base, b.dataset.lang, state.id);
+        if (row) { setForm(row); state.dirty = false; setMsg(`已载入《${row.title}》`); }
       };
+    });
+    updateSlugStatusMarks();
+  }
+
+  // 语言按钮上的版本状态标记：· 未创建 / ○ 已存在（草稿） / ✓ 已发布。
+  // 这样不用点进去就知道哪几种语言已经写好了，避免「点了没反应」的困惑。
+  function updateSlugStatusMarks() {
+    const box = $('f-lang');
+    if (!box) return;
+    const cur = state.id ? allPosts.find((p) => p.id === state.id) : null;
+    const rawSlug = cur?.slug || $('f-slug').value.trim();
+    const base = rawSlug ? stripLangSuffix(rawSlug) : '';
+    box.querySelectorAll('button[data-v]').forEach((b) => {
+      const code = b.dataset.v;
+      const label = LANGS[code] === 'EN' ? 'EN' : (LANGS[code] === '日本語' ? '日本語' : '中文');
+      let mark = '';
+      if (base) {
+        // 当前正在编辑的这一版，按编辑器里的状态算（未保存的改动也反映出来）
+        if (code === state.lang) {
+          mark = state.status === 'published' ? '✓' : '○';
+        } else {
+          const row = findVersion(base, code, state.id);
+          mark = row ? (row.published ? '✓' : '○') : '·';
+        }
+      }
+      b.innerHTML = `${label}<span class="wb-lang-mark">${mark}</span>`;
     });
   }
 
@@ -1026,9 +1048,9 @@ Astro.response.headers.set('Cache-Control', 'no-store');
 
     // 是否已有该语言的译文行：有 → 载入其框架后覆盖内容（更新）；无 → 以当前文章为蓝本新建
     const cur = state.id ? allPosts.find((p) => p.id === state.id) : null;
-    const base = baseSlug(cur?.slug || $('f-slug').value || slugify(title));
+    const base = stripLangSuffix(cur?.slug || $('f-slug').value || slugify(title));
     const existing = allPosts.find(
-      (p) => p.id !== state.id && baseSlug(p.slug) === base && (p.lang || 'zh') === targetLang
+      (p) => p.id !== state.id && stripLangSuffix(p.slug) === base && langOf(p) === targetLang
     );
     const langName = targetLang === 'en' ? '英文' : '日文';
 
@@ -1064,19 +1086,17 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       if (existing) {
         setForm(existing); // 保留英文版自己的分类/封面/发布状态，只覆盖三项内容
       } else {
-        // 切到新建态：发布时 INSERT 译文行，不会覆盖中文原文
-        state.id = '';
-        state.lang = targetLang;
-        syncSeg($('f-lang'), targetLang);
-        // 以原文的 base slug 为准拼目标语言后缀（此刻标题仍是原文，不能按标题推导）
-        syncSlugWithLang(targetLang, base);
-        $('delete-btn').hidden = true;
+        // 复用统一的「切版本」入口：无该语言版本时它会转入新建态（清 id、slug 拼后缀、置草稿），
+        // 发布时 INSERT 译文行，不会覆盖原文。避免与语言按钮各自维护一套切换逻辑。
+        switchLangVersion(targetLang);
       }
       $('f-title').value = result.title;
       $('f-excerpt').value = result.excerpt || '';
       $('f-content').value = result.content;
+      state.dirty = true;
       renderPreview();
       updateSlugHint();
+      updateLangState();
       saveLocalDraft();
       setTrMsg(
         `✓ 译文已填入${result.parts > 1 ? `（长文分 ${result.parts} 段翻译，请重点检查段落衔接）` : ''}。请通读检查后点击「发布」`,
@@ -1119,6 +1139,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     renderPreview();
     updateSlugHint();
     updateLangState();
+    state.dirty = false; // 刚载入的行视为「无未保存改动」
     saveLocalDraft();
   }
 
@@ -1209,14 +1230,98 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       input.value = want;
       updateSlugHint();
     }
-    // 新建文章（无 id）的 slug 由系统派生，语言/标题变更都应跟随；
-    // 已发布文章保持用户/库里的 slug 不变，不进入自动派生。
-    slugAuto = !state.id;
-    // 已上线文章改语言会连带改 URL，必须让用户知道旧链接会失效
-    // （用 tr-msg 而非底部 save-msg：切语言时视线在编辑器顶部，底部提示看不到）
-    if (state.id) {
-      setTrMsg(`语言已切到${LANGS[nextLang]}，Slug 同步为「${want}」；该文章 URL 随之变化，旧链接将失效`, '');
+    // 注意：这里不重置 slugAuto。
+    //  - 由 switchLangVersion 命中已有版本时，setForm() 已经按该行状态重置过；
+    //  - 用户手输过 slug（slugAuto=false）时，切语言只换后缀、必须保留其主体名；
+    //  - 新建文章由标题输入处维护自动派生，无需在此重复判定。
+  }
+
+  // 判断一行属于哪种语言：优先信任 lang 字段；
+  // 但历史数据存在 lang 未填/填错（如 error-and-debug-en 的 lang 仍是 zh），
+  // 因此 lang 缺失或与 slug 后缀明显矛盾时，按 slug 后缀兜底推断，保证归组与切换不跑偏。
+  function langOf(row) {
+    if (!row) return 'zh';
+    const declared = row.lang || '';
+    const slug = String(row.slug || '');
+    if (/-en$/.test(slug)) return declared === 'en' ? 'en' : 'en';
+    if (/-ja$/.test(slug)) return declared === 'ja' ? 'ja' : 'ja';
+    return declared || 'zh';
+  }
+
+  // 在已加载的全量文章里，找「同一篇 + 指定语言」的那一行。
+  // excludeId：排除当前正在编辑的行（避免找到自己）；返回 null 表示该语言版本尚不存在。
+  // 比较时用 stripLangSuffix 而非 baseSlug：与调用方传入的 base 口径保持一致（都能剥净多重后缀）。
+  function findVersion(base, lang, excludeId) {
+    return allPosts.find(
+      (p) => String(p.id) !== String(excludeId || '') && stripLangSuffix(p.slug) === base && langOf(p) === lang
+    ) || null;
+  }
+
+  // 切换编辑器当前展示的语言版本——这是语言按钮的核心。
+  //   有该语言版本 → setForm(那一行)：标题、摘要、正文、slug、id、发布状态一次性全部换过去
+  //   无该语言版本 → 转「新建该语言版本」态：清 id、slug = base + 后缀、置草稿，等作者翻译或撰写
+  // 这样点 EN 就真的在看英文内容，而不是只把标识改成英文（历史实现只改标识，会导致中文内容覆盖英文行）。
+  function switchLangVersion(nextLang) {
+    if (!LANGS[nextLang] || nextLang === state.lang) {
+      syncSeg($('f-lang'), state.lang);
+      return;
     }
+
+    // 未保存保护：当前内容有改动时先存本地草稿再切，避免切走丢内容
+    if (state.dirty) saveLocalDraft();
+
+    const cur = state.id ? allPosts.find((p) => p.id === state.id) : null;
+    const rawSlug = ($('f-slug').value || '').trim();
+    // 主体名用 stripLangSuffix（循环剥净多重后缀）：手输 dup-en-ja 时主体应为 dup，
+    // 若用只剥一层的 baseSlug 会得到 dup-en，再拼 -ja 又变回 dup-en-ja。
+    const base = stripLangSuffix(cur?.slug || rawSlug || slugify($('f-title').value || ''));
+
+    // 当前是「新建态」且还没写任何内容：直接换标识即可，不打断输入
+    const isBlankNew = !state.id && !$('f-title').value.trim() && !$('f-content').value.trim();
+
+    if (!base) {
+      // 连主体名都没有（刚点新建、什么都没填）：只切标识与后缀
+      state.lang = nextLang;
+      syncSeg($('f-lang'), nextLang);
+      syncSlugWithLang(nextLang);
+      updateSlugHint();
+      updateLangState();
+      return;
+    }
+
+    const target = findVersion(base, nextLang, state.id);
+
+    if (target) {
+      // ① 已有该语言版本 → 整行载入（setForm 会一并换标题/摘要/正文/slug/id/发布状态）
+      setForm(target);
+      state.dirty = false;
+      const label = LANGS[nextLang];
+      setTrMsg(`已切换到${label}版，标题、摘要、正文均为${label}内容`, 'ok');
+      // 各语言 URL 不同：切换只是换编辑对象，不会改动线上地址，明确告知避免误解
+      if (target.published) {
+        setTrMsg(`已切换到${label}版（已发布，URL ${postUrl(target)}）；当前编辑的就是该语言线上文章`, 'ok');
+      }
+    } else {
+      // ② 尚无该语言版本 → 转新建态，slug 以原文 base 为准拼后缀（标题此刻仍是原文，不能按标题推导）
+      state.id = '';
+      state.lang = nextLang;
+      state.status = 'draft';
+      syncSeg($('f-lang'), nextLang);
+      syncSeg($('f-status'), 'draft');
+      $('delete-btn').hidden = true;
+      syncSlugWithLang(nextLang, base);
+      updateSlugStatusMarks();
+      const label = nextLang === 'en' ? '英文' : (nextLang === 'ja' ? '日文' : '中文');
+      setTrMsg(
+        isBlankNew
+          ? `已切到${LANGS[nextLang]}，Slug 已带后缀；该文尚无${label}版，发布将新建`
+          : `该文尚无${label}版：已转入新建态（Slug 沿用主体名 + 后缀，状态为草稿）。当前内容仍是原文，请点「译成${label}」生成译文或自行改写后再发布`,
+        'warn'
+      );
+    }
+
+    updateSlugHint();
+    updateLangState();
   }
 
   // 实时提示最终会使用的 Slug（含完整路径，便于直观确认语言与后缀是否一致）
@@ -1315,7 +1420,11 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       }
 
       if (state.id) {
-        ({ error } = await supabase.from('posts').update(row).eq('id', state.id));
+        // P0 防数据损坏：语言归属由「行」本身决定（slug 后缀 + lang 字段），
+        // 不允许通过一次 update 把已有行的语言改掉——否则在中文版上误点 EN 再保存，
+        // 会把中文那行的 lang 改成 'en'，中文版就"消失"了。换语言必须走 switchLangVersion()。
+        const { lang: _omitLang, ...patch } = row;
+        ({ error } = await supabase.from('posts').update(patch).eq('id', state.id));
       } else {
         // 新建：作者预设了发布时间则用之，否则取当前时间
         const r = await supabase.from('posts').insert({ ...row, published_at: row.published_at || new Date().toISOString() });
@@ -1401,7 +1510,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     const langOrder = { zh: 0, en: 1, ja: 2 };
     const allRows = [...groupMap.values()].map((posts) => {
       const sorted = [...posts].sort(
-        (a, b) => (langOrder[a.lang || 'zh'] ?? 9) - (langOrder[b.lang || 'zh'] ?? 9)
+        (a, b) => (langOrder[langOf(a)] ?? 9) - (langOrder[langOf(b)] ?? 9)
       );
       return { rep: sorted[0], versions: sorted };
     });
@@ -1446,10 +1555,12 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       const url = postUrl(rep);
       // 语言标签：组内每个已存在的语言一个可点击标签，点击直接载入该版本进编辑器
       const langTags = versions
-        .map(
-          (v) =>
-            `<button type="button" class="wb-item-lang" data-id="${v.id}" title="编辑${LANGS[v.lang || 'zh']}版">${LANGS[v.lang] || v.lang || '中文'}</button>`
-        )
+        .map((v) => {
+          // 用 langOf 而非裸 v.lang：历史脏数据（如 error-and-debug-en 的 lang 仍是 zh）
+          // 会显示成三个「中文」，按 slug 后缀兜底才能正确标出 EN / 日本語。
+          const code = langOf(v);
+          return `<button type="button" class="wb-item-lang" data-id="${v.id}" title="编辑${LANGS[code]}版">${LANGS[code]}</button>`;
+        })
         .join('');
       main.innerHTML = inTrash
         ? `<span class="wb-item-title is-trash">${escapeHtml(rep.title || '(无标题)')}</span>
@@ -1517,8 +1628,18 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         edit.type = 'button';
         edit.className = 'wb-item-edit';
         edit.textContent = '编辑';
-        edit.title = versions.length > 1 ? '打开中文版（其他语言请点左侧语言标签）' : '在编辑器中打开修改';
-        edit.onclick = () => openEditor(rep);
+        // 默认打开「最近发布/更新过的那一版」，符合"刚改完哪版就继续改哪版"的直觉。
+        // 注意：posts 表没有 updated_at 列（带上该列会 400），故以 published_at 为准，都没有则回退中文版。
+        // 其他语言可点左侧语言标签直达。
+        const recent = [...versions].sort((a, b) => {
+          const ta = new Date(a.published_at || 0).getTime() || 0;
+          const tb = new Date(b.published_at || 0).getTime() || 0;
+          return tb - ta;
+        })[0] || rep;
+        edit.title = versions.length > 1
+          ? `打开最近修改的${LANGS[langOf(recent)]}版；其他语言请点左侧语言标签`
+          : '在编辑器中打开修改';
+        edit.onclick = () => openEditor(recent);
 
         const del = document.createElement('button');
         del.type = 'button';
@@ -1670,22 +1791,33 @@ Astro.response.headers.set('Cache-Control', 'no-store');
 
   // ---------- 本地自动保存 ----------
   let autosaveTimer;
+  // 草稿按语言分键：切到「尚无该语言版本」的新建态时，三语的未保存内容不会互相覆盖
+  function draftKey(lang = state.lang) { return `${DRAFT_KEY}:${lang || 'zh'}`; }
+
   function saveLocalDraft() {
     clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(() => {
-      const snap = { ...collectRow(), id: state.id };
+      const snap = { ...collectRow(), id: state.id, _ts: Date.now() };
       if (!snap.title && !snap.content) return;
-      try { localStorage.setItem(DRAFT_KEY, JSON.stringify(snap)); } catch {}
+      try { localStorage.setItem(draftKey(), JSON.stringify(snap)); } catch {}
     }, 700);
   }
 
-  function clearLocalDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch {} }
+  function clearLocalDraft() { try { localStorage.removeItem(draftKey()); } catch {} }
 
   function restoreLocalDraft() {
     try {
-      const raw = localStorage.getItem(DRAFT_KEY);
-      if (!raw) return;
-      const snap = JSON.parse(raw);
+      // 依次尝试各语言草稿键，恢复最近保存的那一份（旧版单键也兼容读取）
+      const keys = [draftKey('zh'), draftKey('en'), draftKey('ja'), DRAFT_KEY];
+      let snap = null, bestTs = 0;
+      for (const k of keys) {
+        const raw = localStorage.getItem(k);
+        if (!raw) continue;
+        const s = JSON.parse(raw);
+        const ts = Number(s._ts || 0);
+        if (!snap || ts > bestTs) { snap = s; bestTs = ts; }
+      }
+      if (!snap) return;
       if (snap.id) return; // 只恢复「新建」场景
       openEditor(snap);
       setMsg('已恢复上次未保存的内容', 'ok');
@@ -1906,16 +2038,10 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     };
 
     // 分段控件：语言 / 状态
-    // 语言切换联动 Slug：中文无后缀、EN 补 -en、JA 补 -ja；
-    // 已填 slug 只替换后缀部分，手输的主体名保留
+    // 语言切换 = 切换版本：有该语言版本则整行载入（标题/摘要/正文一起换），无则转新建态。
+    // 具体逻辑见 switchLangVersion()——不再只改标识与 slug 后缀。
     $('f-lang').querySelectorAll('button').forEach((b) => b.onclick = () => {
-      const next = b.dataset.v;
-      if (next === state.lang) { syncSeg($('f-lang'), state.lang); return; }
-      state.lang = next;
-      syncSeg($('f-lang'), state.lang);
-      syncSlugWithLang(next);
-      updateSlugHint();
-      saveLocalDraft();
+      switchLangVersion(b.dataset.v);
     });
     $('f-status').querySelectorAll('button').forEach((b) => b.onclick = () => {
       state.status = b.dataset.v; syncSeg($('f-status'), state.status);
@@ -1937,7 +2063,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     $('wb-search').addEventListener('input', (e) => { state.query = e.target.value; renderList(); });
 
     // 正文输入：预览 + 自动保存
-    $('f-content').addEventListener('input', () => { renderPreview(); saveLocalDraft(); });
+    $('f-content').addEventListener('input', () => { state.dirty = true; renderPreview(); saveLocalDraft(); });
     ['f-title', 'f-excerpt', 'f-cover', 'f-slug', 'f-author'].forEach((id) => {
       $(id).addEventListener('input', () => {
         if (id === 'f-title') {
@@ -1953,6 +2079,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
           slugAuto = false;
           updateSlugHint();
         }
+        state.dirty = true;
         saveLocalDraft();
       });
     });
