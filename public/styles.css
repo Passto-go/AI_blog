@@ -467,15 +467,17 @@ a { color: inherit; }
 #mod-write.editing .wb-main {
   display: block;
   position: fixed; inset: 0; z-index: 90; /* 高于 sticky 头部(50)，低于 toast(120) */
-  padding: 24px 16px; overflow: auto;
+  /* 内边距加大：让编辑器卡片与最外层滚动容器留出呼吸空间，避免贴边不便操作 */
+  padding: 40px 40px 56px; overflow: auto;
   background: rgba(15, 18, 25, .45);
   animation: wb-fade .15s ease;
 }
 [data-theme="dark"] #mod-write.editing .wb-main { background: rgba(0, 0, 0, .6); }
 #mod-write.editing .wb-editor-card {
   position: relative;
-  width: 100%; max-width: 920px; margin: 0 auto;
-  max-height: calc(100vh - 48px); overflow: auto;
+  /* 宽度对齐后台主体容器（--wrap = 1080px），不再比管理界面窄 */
+  width: 100%; max-width: var(--wrap); margin: 0 auto;
+  max-height: calc(100vh - 96px); overflow: auto;
   animation: wb-pop .18s ease;
 }
 @keyframes wb-pop {
@@ -494,6 +496,12 @@ a { color: inherit; }
 }
 #mod-write.editing .wb-editor-close:hover { background: #cf222e; border-color: #cf222e; color: #fff; }
 [data-theme="dark"] #mod-write.editing .wb-editor-close:hover { background: #f85149; border-color: #f85149; }
+
+/* 中等宽度：收一点内边距，避免弹窗可用宽度被挤太小 */
+@media (max-width: 1100px) {
+  #mod-write.editing .wb-main { padding: 24px 20px 40px; }
+  #mod-write.editing .wb-editor-card { max-height: calc(100vh - 64px); }
+}
 
 /* 窄屏：编辑器弹窗全屏 */
 @media (max-width: 640px) {
@@ -1259,10 +1267,68 @@ a { color: inherit; }
 .wb-cat-note { margin: 0 0 12px; }
 .wb-cat-item { padding: 12px 4px; border-bottom: 1px solid var(--border); }
 .wb-cat-item:last-child { border-bottom: none; }
-.wb-cat-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.wb-cat-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .wb-cat-name { font-size: 14px; font-weight: 600; color: var(--text-strong); }
 .wb-cat-slug { font-size: 12px; color: var(--muted); }
 .wb-cat-count { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+/* 分类名 / 篇数可点击：展开该分类下的文章列表 */
+.wb-cat-name--toggle,
+.wb-cat-count--toggle {
+  border: none; background: none; padding: 0; cursor: pointer; font: inherit;
+  color: var(--text-strong); text-align: left; border-radius: 6px;
+  transition: color .15s;
+}
+.wb-cat-name--toggle { font-size: 14px; font-weight: 600; display: inline-flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.wb-cat-name--toggle:hover, .wb-cat-count--toggle:hover { color: var(--accent); }
+.wb-cat-count--toggle { font-size: 12px; color: var(--muted); margin-left: auto; }
+.wb-cat-count--toggle:hover { text-decoration: underline; }
+.wb-cat-toggle-icon { font-size: 11px; color: var(--muted); transition: transform .15s; }
+.wb-cat-item.is-open .wb-cat-toggle-icon { color: var(--accent); }
+
+/* 三语名称小标签 */
+.wb-cat-alt {
+  font-size: 11px; font-weight: 400; color: var(--muted);
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 1px 7px;
+}
+.wb-cat-alt--missing { color: #b26a00; border-color: #f0d9a8; background: #fff8e6; }
+[data-theme="dark"] .wb-cat-alt--missing { color: #d29922; border-color: #4a3c1a; background: #2a2410; }
+
+/* 展开区：该分类下的文章列表（行内手风琴） */
+.wb-cat-posts {
+  margin: 6px 0 10px; padding: 10px 12px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+}
+.wb-cat-posts-empty { margin: 0; font-size: 13px; color: var(--muted); }
+.wb-cat-posts-head {
+  font-size: 12px; color: var(--muted); margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.wb-cat-posts-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.wb-cat-posts-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 8px; border-radius: 8px; font-size: 13px;
+  transition: background .12s;
+}
+.wb-cat-posts-item:hover { background: var(--surface); }
+.wb-cat-posts-lang {
+  flex: none; font-size: 11px; padding: 1px 7px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); font-weight: 600;
+  min-width: 34px; text-align: center;
+}
+.wb-cat-posts-title {
+  flex: 1; min-width: 0; color: var(--text); text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wb-cat-posts-date { flex: none; font-size: 12px; color: var(--muted); }
+.wb-cat-posts-edit {
+  flex: none; font-size: 12px; padding: 3px 10px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text); font-family: inherit;
+  transition: border-color .15s, color .15s;
+}
+.wb-cat-posts-edit:hover { border-color: var(--accent); color: var(--accent); }
 .wb-cat-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .wb-cat-select {
   font: inherit; font-size: 13px; padding: 5px 8px;

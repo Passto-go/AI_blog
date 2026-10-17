@@ -204,6 +204,18 @@ export async function getSetting(key) {
 // 分类列表（含每类文章数）。
 // 以 categories 注册表为「名称/Slug 权威源」，叠加已发布文章的实际计数；
 // 注册表缺失或查询失败时，降级为纯文章推导，保证站点不崩。
+//
+// 多语言名称：categories 表用 name(中文) / name_en / name_ja 三列分别存，
+// 这里按当前 lang 选出对应名称并回退中文（缺失绝不显示空白）。
+// 注意 slug 是全站唯一标识，与语言无关——三语共用同一个分类 slug。
+export function pickCategoryName(row, lang = 'zh') {
+  if (!row) return '';
+  const zh = (row.name || '').trim();
+  if (lang === 'en') return (row.name_en || '').trim() || zh || row.slug || '';
+  if (lang === 'ja') return (row.name_ja || '').trim() || zh || row.slug || '';
+  return zh || row.slug || '';
+}
+
 export async function getCategories(lang = 'zh') {
   const posts = await getPosts(lang);
 
@@ -218,10 +230,18 @@ export async function getCategories(lang = 'zh') {
   let registry = [];
   try {
     const supabase = createClient(URL, KEY, { auth: { persistSession: false } });
-    const { data, error } = await supabase
+    // 先尝试带多语言列查询；若数据库尚未执行迁移（无 name_en/name_ja 列），
+    // 回退为只取 name，保证上线顺序不受影响（先发代码、后执行 SQL 也不会 500）。
+    let { data, error } = await supabase
       .from('categories')
-      .select('name, slug')
+      .select('name, name_en, name_ja, slug')
       .order('created_at', { ascending: true });
+    if (error && /name_en|name_ja|column/i.test(error.message || '')) {
+      ({ data, error } = await supabase
+        .from('categories')
+        .select('name, slug')
+        .order('created_at', { ascending: true }));
+    }
     if (!error && data) registry = data;
   } catch {
     registry = []; // 表尚未创建：忽略，按纯文章推导
@@ -231,14 +251,27 @@ export async function getCategories(lang = 'zh') {
   // 先放注册表（名称权威，count 先 0）
   for (const r of registry) {
     if (!r.slug) continue;
-    map.set(r.slug, { name: r.name || r.slug, slug: r.slug, count: 0, fromRegistry: true });
+    map.set(r.slug, {
+      // name = 当前语言下的显示名；names = 三语全量（后台/其他地方复用）
+      name: pickCategoryName(r, lang),
+      names: {
+        zh: (r.name || '').trim(),
+        en: (r.name_en || '').trim(),
+        ja: (r.name_ja || '').trim(),
+      },
+      slug: r.slug,
+      count: 0,
+      fromRegistry: true,
+    });
   }
   // 再用文章计数叠加；文章里有但注册表没有的（历史脏数据）用文章名兜底
   for (const [slug, n] of counts) {
     if (!map.has(slug)) {
       const sample = posts.find((x) => (x.categorySlug || 'uncategorized') === slug);
+      const fallback = sample?.category || slug;
       map.set(slug, {
-        name: sample?.category || slug,
+        name: fallback,
+        names: { zh: sample?.category || '', en: '', ja: '' },
         slug,
         count: 0,
         fromRegistry: false,

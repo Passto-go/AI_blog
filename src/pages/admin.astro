@@ -253,10 +253,12 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               <button id="cat-add-btn" class="wb-cat-add" type="button">＋ 新增分类</button>
               <ul id="cat-list-manage" class="wb-list"></ul>
               <div id="cat-add-box" class="wb-cat-new wb-cat-new--manage" hidden>
-                <input id="cat-add-name" class="wb-cat" placeholder="显示名，如：技术随笔" />
+                <input id="cat-add-name" class="wb-cat" placeholder="中文名（必填），如：技术随笔" />
+                <input id="cat-add-name-en" class="wb-cat" placeholder="English name（可选，如 Tech Notes）" />
+                <input id="cat-add-name-ja" class="wb-cat" placeholder="日本語名（可选，如 技術メモ）" />
                 <input id="cat-add-slug" class="wb-cat" placeholder="slug（留空自动生成，仅小写字母/数字/连字符）" />
                 <span id="cat-add-preview" class="wb-cat-slug-preview"></span>
-                <span class="wb-hint wb-cat-new-hint">名称＝前台显示的分类名；Slug＝网址里的英文后缀（仅小写字母/数字/-）。</span>
+                <span class="wb-hint wb-cat-new-hint">中文名必填；EN / 日本語 留空则该语言前台回退显示中文名。Slug＝网址里的后缀，三语共用同一个。</span>
                 <button id="cat-add-save" class="wb-cat-act" type="button">保存</button>
                 <button id="cat-add-cancel" class="wb-cat-act wb-cat-cancel" type="button">取消</button>
                 <span id="cat-add-msg" class="wb-cat-rename-msg"></span>
@@ -766,29 +768,37 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     await loadComments();
   }
 
-  // ---------- 分类管理（合并 / 删除；重命名暂未开放） ----------
+  // ---------- 分类管理（三语名称 / 合并 / 删除 / 点开看文章） ----------
+  // 展开状态：记录当前展开的分类 slug（单开，避免页面过长）
+  let catExpandedSlug = '';
+
   async function loadCatManage() {
     const ul = $('cat-list-manage');
     if (!ul) return;
     let rows;
     try {
-      const { data: posts, error } = await supabase.from('posts').select('category, category_slug');
+      const { data: posts, error } = await supabase
+        .from('posts').select('category, category_slug, deleted_at');
       if (error) { ul.innerHTML = '<li class="wb-empty">读取失败：' + error.message + '</li>'; return; }
       const map = new Map();
       (posts || []).forEach((p) => {
+        if (p.deleted_at) return; // 垃圾箱文章不计入分类篇数
         const name = (p.category || '').trim();
         const slug = (p.category_slug || '').trim() || slugify(name) || 'uncategorized';
         if (!name && slug === 'uncategorized') return;
-        if (!map.has(slug)) map.set(slug, { name: name || slug, slug, count: 0 });
+        if (!map.has(slug)) map.set(slug, { name: name || slug, name_en: '', name_ja: '', slug, count: 0 });
         map.get(slug).count++;
       });
-      // 注册表（含 0 篇的新增分类），名称以注册表为准
+      // 注册表（含 0 篇的新增分类），名称以注册表为准（含三语）
       try {
-        const { data: reg } = await supabase.from('categories').select('name, slug');
+        const { data: reg } = await supabase.from('categories').select('name, name_en, name_ja, slug');
         (reg || []).forEach((r) => {
           if (!r.slug) return;
-          if (!map.has(r.slug)) map.set(r.slug, { name: r.name || r.slug, slug: r.slug, count: 0 });
-          else map.get(r.slug).name = r.name || map.get(r.slug).name;
+          if (!map.has(r.slug)) map.set(r.slug, { name: r.name || r.slug, name_en: '', name_ja: '', slug: r.slug, count: 0 });
+          const row = map.get(r.slug);
+          row.name = r.name || row.name;
+          row.name_en = r.name_en || '';
+          row.name_ja = r.name_ja || '';
         });
       } catch {}
       rows = [...map.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
@@ -805,13 +815,69 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   function renderCatItem(c, all) {
     const li = document.createElement('li');
     li.className = 'wb-cat-item';
+
     const main = document.createElement('div');
     main.className = 'wb-cat-row';
-    main.innerHTML =
-      '<span class="wb-cat-name">' + escapeHtml(c.name) + '</span>' +
-      '<span class="wb-cat-slug">/' + escapeHtml(c.slug) + '</span>' +
-      '<span class="wb-cat-count">' + c.count + ' 篇</span>';
+
+    // 分类名做成按钮：点击展开/收起该分类下的文章列表（行内手风琴，单开）
+    const nameBtn = document.createElement('button');
+    nameBtn.type = 'button';
+    nameBtn.className = 'wb-cat-name wb-cat-name--toggle';
+    nameBtn.title = '点击查看该分类下的文章';
+    nameBtn.innerHTML =
+      '<span class="wb-cat-toggle-icon">▸</span>' + escapeHtml(c.name) +
+      (c.name_en ? `<span class="wb-cat-alt">${escapeHtml(c.name_en)}</span>` : '') +
+      (c.name_ja ? `<span class="wb-cat-alt">${escapeHtml(c.name_ja)}</span>` : '') +
+      (!c.name_en || !c.name_ja ? '<span class="wb-cat-alt wb-cat-alt--missing">缺译文</span>' : '');
+    main.appendChild(nameBtn);
+
+    const slugEl = document.createElement('span');
+    slugEl.className = 'wb-cat-slug';
+    slugEl.textContent = '/' + c.slug;
+    main.appendChild(slugEl);
+
+    const countBtn = document.createElement('button');
+    countBtn.type = 'button';
+    countBtn.className = 'wb-cat-count wb-cat-count--toggle';
+    countBtn.textContent = c.count + ' 篇';
+    countBtn.title = '点击查看该分类下的文章';
+    main.appendChild(countBtn);
+
     li.appendChild(main);
+
+    // 展开区（懒渲染：只在展开时才生成，避免分类多时拖慢）
+    const panel = document.createElement('div');
+    panel.className = 'wb-cat-posts';
+    panel.hidden = true;
+    li.appendChild(panel);
+
+    const toggle = () => {
+      const willOpen = catExpandedSlug !== c.slug;
+      catExpandedSlug = willOpen ? c.slug : '';
+      // 关闭所有已展开的，再按需展开当前
+      document.querySelectorAll('#cat-list-manage .wb-cat-item').forEach((node) => {
+        const p = node.querySelector('.wb-cat-posts');
+        const icon = node.querySelector('.wb-cat-toggle-icon');
+        if (p) p.hidden = true;
+        if (icon) icon.textContent = '▸';
+        node.classList.remove('is-open');
+      });
+      if (willOpen) {
+        renderCatPosts(panel, c);
+        panel.hidden = false;
+        li.classList.add('is-open');
+        nameBtn.querySelector('.wb-cat-toggle-icon').textContent = '▾';
+      }
+    };
+    nameBtn.onclick = toggle;
+    countBtn.onclick = toggle;
+    // 若刷新前正处于展开状态，保持展开
+    if (catExpandedSlug === c.slug) {
+      renderCatPosts(panel, c);
+      panel.hidden = false;
+      li.classList.add('is-open');
+      nameBtn.querySelector('.wb-cat-toggle-icon').textContent = '▾';
+    }
 
     const acts = document.createElement('div');
     acts.className = 'wb-cat-acts';
@@ -865,6 +931,71 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     return li;
   }
 
+  // 渲染「该分类下的文章」列表（行内手风琴展开区）。
+  // 数据直接取内存里的 allPosts（loadList 已 select('*') 全量加载），点击即时呈现、无需再请求。
+  // 三语文章共用同一个 category_slug，故这里会同时列出各语言版本，用语言标签区分。
+  function renderCatPosts(panel, c) {
+    panel.innerHTML = '';
+    const rows = (allPosts || [])
+      .filter((p) => !p.deleted_at && (p.category_slug || 'uncategorized') === c.slug)
+      .sort((a, b) => new Date(b.published_at || 0) - new Date(a.published_at || 0));
+
+    if (!rows.length) {
+      panel.innerHTML = '<p class="wb-cat-posts-empty">该分类下暂无文章</p>';
+      return;
+    }
+
+    const head = document.createElement('div');
+    head.className = 'wb-cat-posts-head';
+    head.innerHTML = `<span>${rows.length} 篇文章</span>`;
+    panel.appendChild(head);
+
+    const ul = document.createElement('ul');
+    ul.className = 'wb-cat-posts-list';
+    rows.forEach((p) => {
+      const li = document.createElement('li');
+      li.className = 'wb-cat-posts-item';
+
+      // 语言标签
+      const langTag = document.createElement('span');
+      langTag.className = 'wb-cat-posts-lang';
+      langTag.textContent = LANGS[langOf(p)];
+      li.appendChild(langTag);
+
+      // 标题
+      const title = document.createElement('span');
+      title.className = 'wb-cat-posts-title';
+      title.textContent = p.title || '(无标题)';
+      title.title = p.title || '';
+      li.appendChild(title);
+
+      // 状态
+      const badge = document.createElement('span');
+      badge.className = 'wb-badge ' + (p.published ? 'is-live' : 'is-draft');
+      badge.textContent = p.published ? '已发布' : '草稿';
+      li.appendChild(badge);
+
+      // 发布时间
+      const date = document.createElement('span');
+      date.className = 'wb-cat-posts-date';
+      date.textContent = p.published_at
+        ? new Date(p.published_at).toLocaleDateString('zh-CN')
+        : '—';
+      li.appendChild(date);
+
+      // 操作：打开编辑器
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'wb-cat-posts-edit';
+      edit.textContent = '编辑';
+      edit.onclick = () => openEditor(p);
+      li.appendChild(edit);
+
+      ul.appendChild(li);
+    });
+    panel.appendChild(ul);
+  }
+
   // 进入「重命名」内联编辑态
   function startRename(li, c, all) {
     li.innerHTML = '';
@@ -873,7 +1004,17 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     const nameInput = document.createElement('input');
     nameInput.className = 'wb-cat-input';
     nameInput.value = c.name;
-    nameInput.placeholder = '分类显示名';
+    nameInput.placeholder = '中文名（必填）';
+
+    const nameEnInput = document.createElement('input');
+    nameEnInput.className = 'wb-cat-input';
+    nameEnInput.value = c.name_en || '';
+    nameEnInput.placeholder = 'English name（可选）';
+
+    const nameJaInput = document.createElement('input');
+    nameJaInput.className = 'wb-cat-input';
+    nameJaInput.value = c.name_ja || '';
+    nameJaInput.placeholder = '日本語名（可选）';
 
     const slugInput = document.createElement('input');
     slugInput.className = 'wb-cat-input';
@@ -905,7 +1046,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       if (!/^[a-z0-9-]+$/.test(newSlug)) { msg.textContent = 'Slug 只能是小写字母、数字和连字符'; return; }
       if (newSlug !== c.slug && all.some((o) => o.slug === newSlug)) { msg.textContent = '该 Slug 已存在'; return; }
       save.textContent = '保存中…'; save.disabled = true;
-      const ok = await renameCategory(c, newName, newSlug);
+      const ok = await renameCategory(c, newName, newSlug, nameEnInput.value.trim(), nameJaInput.value.trim());
       if (ok) await loadCatManage();
       else { save.textContent = '保存'; save.disabled = false; }
     };
@@ -918,7 +1059,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
 
     const row1 = document.createElement('div');
     row1.className = 'wb-cat-rename-row';
-    row1.append(nameInput, slugInput, preview);
+    row1.append(nameInput, nameEnInput, nameJaInput, slugInput, preview);
     const row2 = document.createElement('div');
     row2.className = 'wb-cat-rename-row';
     row2.append(save, cancel, msg);
@@ -926,15 +1067,22 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     nameInput.focus();
   }
 
-  async function renameCategory(src, newName, newSlug) {
+  async function renameCategory(src, newName, newSlug, nameEn = '', nameJa = '') {
     // 1) 改写该分类下所有文章的显示名与 slug
+    //    注意：posts.category 只是中文名快照，英/日名称以 categories 表为准，这里不动。
     const { error } = await supabase
       .from('posts').update({ category: newName, category_slug: newSlug })
       .eq('category_slug', src.slug);
     if (error) { alert('重命名失败：' + error.message); return false; }
-    // 同步注册表（best-effort）
+    // 同步注册表（best-effort）。name_en / name_ja 若列为空字符串，写入空串（前台会回退中文）。
     try {
-      await supabase.from('categories').update({ name: newName, slug: newSlug }).eq('slug', src.slug);
+      const patch = { name: newName, slug: newSlug, name_en: nameEn || null, name_ja: nameJa || null };
+      let { error: regErr } = await supabase
+        .from('categories').update(patch).eq('slug', src.slug);
+      // 数据库尚未执行迁移（无 name_en/name_ja 列）时，回退为只改 name/slug，避免整体失败
+      if (regErr && /name_en|name_ja|column/i.test(regErr.message || '')) {
+        await supabase.from('categories').update({ name: newName, slug: newSlug }).eq('slug', src.slug);
+      }
     } catch {}
     try {
       // 2) 级联：原本指向旧 slug 的别名，改指向新 slug（处理 A→B→C 链路）
@@ -957,8 +1105,17 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       .eq('category_slug', src.slug);
     if (error) { alert('合并失败：' + error.message); return false; }
     // 同步注册表（best-effort）：确保目标存在，删除源
+    // 目标若缺译文，用源分类的译文补上，避免合并后英文/日文名丢失
     try {
-      await supabase.from('categories').upsert({ name: dst.name, slug: dst.slug }, { onConflict: 'slug' });
+      await supabase.from('categories').upsert(
+        {
+          name: dst.name,
+          slug: dst.slug,
+          name_en: dst.name_en || src.name_en || null,
+          name_ja: dst.name_ja || src.name_ja || null,
+        },
+        { onConflict: 'slug' }
+      );
       await supabase.from('categories').delete().eq('slug', src.slug);
     } catch {}
     return true;
@@ -1760,18 +1917,28 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   // 分类管理：新增分类（写入注册表，0 篇也会在前台显示）
   async function addCategory() {
     const name = $('cat-add-name').value.trim();
+    const nameEn = ($('cat-add-name-en')?.value || '').trim();
+    const nameJa = ($('cat-add-name-ja')?.value || '').trim();
     const msg = $('cat-add-msg');
-    if (!name) { msg.textContent = '请填写显示名'; return; }
+    if (!name) { msg.textContent = '请填写中文名'; return; }
     let slug = $('cat-add-slug').value.trim() || slugify(name);
     if (!/^[a-z0-9-]+$/.test(slug)) { msg.textContent = 'Slug 只能是小写字母、数字和连字符'; return; }
     if (catOpts.some((c) => c.slug === slug)) { msg.textContent = '该 Slug 已存在'; return; }
     const saveBtn = $('cat-add-save');
     saveBtn.disabled = true; saveBtn.textContent = '保存中…';
-    const { error } = await supabase.from('categories').insert({ name, slug });
+    // 先带三语写入；若数据库尚无 name_en/name_ja 列则回退为只写 name/slug（部署顺序不受限）
+    let { error } = await supabase.from('categories').insert({
+      name, slug, name_en: nameEn || null, name_ja: nameJa || null,
+    });
+    if (error && /name_en|name_ja|column/i.test(error.message || '')) {
+      ({ error } = await supabase.from('categories').insert({ name, slug }));
+    }
     saveBtn.disabled = false; saveBtn.textContent = '保存';
     if (error) { msg.textContent = '失败：' + error.message; return; }
     $('cat-add-box').hidden = true;
     $('cat-add-name').value = ''; $('cat-add-slug').value = ''; $('cat-add-preview').textContent = '';
+    if ($('cat-add-name-en')) $('cat-add-name-en').value = '';
+    if ($('cat-add-name-ja')) $('cat-add-name-ja').value = '';
     await loadCatManage();
     await loadCategoryOptions();
   }
