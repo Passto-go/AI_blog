@@ -58,6 +58,27 @@ export async function getAllPosts(lang = 'zh') {
   return pickPerArticle((await fetchAll()).map(normalize), lang);
 }
 
+// sitemap / RSS 等需要覆盖全部语言版本的场景：不按语言挑选，返回全部已发布版本。
+export async function getAllPostsEveryLang() {
+  return (await fetchAll()).map(normalize);
+}
+
+// 全部出现过的分类 slug（含注册表里 0 篇文章的分类），供 sitemap 等枚举使用。
+export async function getAllCategorySlugs() {
+  const slugs = new Set();
+  for (const p of await fetchAll()) {
+    slugs.add(normalize(p).categorySlug || 'uncategorized');
+  }
+  try {
+    const supabase = createClient(URL, KEY, { auth: { persistSession: false } });
+    const { data, error } = await supabase
+      .from('categories')
+      .select('slug');
+    if (!error && data) for (const r of data) if (r.slug) slugs.add(r.slug);
+  } catch { /* 表尚未创建：忽略，按文章推导 */ }
+  return [...slugs];
+}
+
 // 按基准 slug 归组，每组挑出最符合目标语言的版本；组内排序稳定，结果按发布时间倒序
 function pickPerArticle(all, lang) {
   const groups = new Map();
