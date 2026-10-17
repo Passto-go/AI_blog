@@ -289,6 +289,10 @@ Astro.response.headers.set('Cache-Control', 'no-store');
 
   const LANGS = { zh: '中文', en: 'EN', ja: '日本語' };
 
+  // slug 自动派生开关：新建文章为 true（slug 随标题/语言联动），
+  // 一旦用户手动改过 slug 即置 false，避免被标题输入或语言切换覆盖。
+  let slugAuto = true;
+
   // 编辑器弹窗：文章管理默认只显示列表；点「新建文章」或行内「编辑」时才弹出编辑器
   // （通过给 #mod-write 加 .editing，把 .wb-main 变成遮罩弹窗，见 styles.css）
   function openEditor(post) {
@@ -1095,6 +1099,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     state.id = p.id || '';
     $('f-title').value = p.title || '';
     $('f-slug').value = p.slug || '';
+    slugAuto = !p.slug; // 有历史 slug（已发布/已存草稿）→ 不自动派生；新建空白 → 自动
     state.catSlug = p.category_slug || (p.category ? slugify(p.category) : '');
     state.catName = p.category || '';
     renderCategorySelect(state.catSlug, state.catName);
@@ -1146,7 +1151,11 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     }
     return {
       title,
-      slug: $('f-slug').value.trim() || autoSlug(title, state.lang),
+      slug: (() => {
+        const raw = $('f-slug').value.trim();
+        // 裸后缀（如用户切语言但还没填标题时的 "-en"）视为未填，交给 autoSlug 按标题生成
+        return (raw && raw !== langSuffix(state.lang)) ? raw : autoSlug(title, state.lang);
+      })(),
       lang: state.lang,
       category,
       category_slug,
@@ -1191,14 +1200,18 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     const input = $('f-slug');
     if (!input) return;
     const raw = input.value.trim();
-    let base = baseOverride || stripLangSuffix(raw);
-    if (!base) base = slugify($('f-title').value || '');
-    if (!base) { input.value = ''; return; }
-
+    // 主体名优先级：传入主体 > 已填 slug 剥后缀 > 标题 slugify；三者皆空则主体为空串。
+    // 中文无后缀；英/日拼后缀——主体为空时即写出裸后缀（如 "-en"），
+    // 满足「新建文章切到英文即填 -en、切日文即填 -ja、中文保持空白」的诉求。
+    let base = baseOverride || stripLangSuffix(raw) || slugify($('f-title').value || '');
     const want = base + langSuffix(nextLang);
-    if (input.value.trim() === want) return;
-    input.value = want;
-
+    if (input.value.trim() !== want) {
+      input.value = want;
+      updateSlugHint();
+    }
+    // 新建文章（无 id）的 slug 由系统派生，语言/标题变更都应跟随；
+    // 已发布文章保持用户/库里的 slug 不变，不进入自动派生。
+    slugAuto = !state.id;
     // 已上线文章改语言会连带改 URL，必须让用户知道旧链接会失效
     // （用 tr-msg 而非底部 save-msg：切语言时视线在编辑器顶部，底部提示看不到）
     if (state.id) {
@@ -1927,7 +1940,19 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     $('f-content').addEventListener('input', () => { renderPreview(); saveLocalDraft(); });
     ['f-title', 'f-excerpt', 'f-cover', 'f-slug', 'f-author'].forEach((id) => {
       $(id).addEventListener('input', () => {
-        if (id === 'f-title' || id === 'f-slug') updateSlugHint();
+        if (id === 'f-title') {
+          updateSlugHint();
+          // 新建文章且处于自动派生模式：标题即 slug 主体，按当前语言拼后缀，让 slug 实时跟随
+          if (slugAuto && !state.id) {
+            $('f-slug').value = slugify($('f-title').value || '') + langSuffix(state.lang);
+            updateSlugHint();
+          }
+        }
+        if (id === 'f-slug') {
+          // 用户手动改了 slug → 退出自动派生，避免被标题/语言切换覆盖
+          slugAuto = false;
+          updateSlugHint();
+        }
         saveLocalDraft();
       });
     });
