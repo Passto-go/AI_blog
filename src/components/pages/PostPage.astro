@@ -1,6 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { getAllPosts, getCategories, renderMarkdown, findTranslation, baseSlug } from '../../lib/posts.js';
+import { getAllPosts, getCategories, toCategoryMap, renderMarkdown, findTranslation, baseSlug } from '../../lib/posts.js';
 import { useTranslations, localizePath, languages } from '../../i18n/ui.js';
 import { formatDate } from '../../lib/format.js';
 import { readingMinutes } from '../../lib/reading-time.js';
@@ -19,7 +19,10 @@ const catHref = post.categorySlug ? localizePath(`/categories/${post.categorySlu
 
 // 上下篇导航：按当前语言取列表（每篇只含该语言版本），避免跳到另一语言的同名文章
 const allPosts = await getAllPosts(lang);
-const cats = await getCategories(lang);
+// 分类名以注册表为准：按 post.category_slug 反查当前语言名称，缺行才回退中文快照
+const cats = await getCategories(lang, { skipPosts: true });
+const catMap = toCategoryMap(cats);
+const postCatName = catMap.get(post.categorySlug)?.name || post.category;
 const wordCount = (post.content || '').replace(/\s+/g, '').length;
 const readMinutes = readingMinutes(post.content);
 const idx = allPosts.findIndex((p) => p.slug === post.slug);
@@ -76,7 +79,7 @@ const missingNotice = (() => {
       <h1 class="post-title">{post.title}</h1>
       <div class="post-meta">
         <span>{dateStr}</span>
-        {post.category && catHref && <a href={catHref} class="post-cat">{post.category}</a>}
+        {postCatName && catHref && <a href={catHref} class="post-cat">{postCatName}</a>}
         <span>{t('post.words', { n: wordCount })}</span>
         <span>{t('post.readTime', { n: readMinutes })}</span>
       </div>

@@ -216,8 +216,10 @@ export function pickCategoryName(row, lang = 'zh') {
   return zh || row.slug || '';
 }
 
-export async function getCategories(lang = 'zh') {
-  const posts = await getPosts(lang);
+// opts.skipPosts：只取注册表、不查文章计数。调用方只用到「名称 / 是否存在」（如分类详情页
+// 校验 slug、文章页显示分类名）时用它，避免为此多读一次 posts（SSR 每请求都会执行）。
+export async function getCategories(lang = 'zh', opts = {}) {
+  const posts = opts.skipPosts ? [] : await getPosts(lang);
 
   // 文章推导的计数（按 slug 归组）
   const counts = new Map();
@@ -283,6 +285,21 @@ export async function getCategories(lang = 'zh') {
   return [...map.values()].sort(
     (a, b) => (b.count - a.count) || String(a.name).localeCompare(String(b.name))
   );
+}
+
+// slug → { name, names, slug } 的字典，供「渲染时按 category_slug 反查注册表」使用。
+// 与 getCategories 共用同一套回退规则（缺译文回退中文 → 回退 slug），保证全站口径一致。
+export function toCategoryMap(list) {
+  const map = new Map();
+  for (const c of list || []) if (c && c.slug) map.set(c.slug, c);
+  return map;
+}
+
+// 已注册分类的 slug 列表。与 getAllCategorySlugs 的区别：只认注册表，不含「文章里出现但
+// 注册表没有」的历史脏数据——用于 301 兼容层，避免把这类 slug 误跳到错误地址。
+export async function getRegisteredCategorySlugs() {
+  const list = await getCategories('zh', { skipPosts: true });
+  return list.filter((c) => c.fromRegistry).map((c) => c.slug);
 }
 
 export async function getPostsByCategory(slug, lang = 'zh') {

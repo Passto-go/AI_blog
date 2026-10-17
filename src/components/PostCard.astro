@@ -2,12 +2,15 @@
 import { localizePath } from '../i18n/ui.js';
 import { formatDate } from '../lib/format.js';
 
-const { post, lang = 'zh' } = Astro.props;
+const { post, lang = 'zh', categories = null } = Astro.props;
 const href = localizePath(`/posts/${post.slug}/`, lang);
 const dateStr = formatDate(post.published_at, lang);
 const catHref = post.categorySlug
   ? localizePath(`/categories/${post.categorySlug}/`, lang)
   : null;
+// 分类名以「注册表按 category_slug 反查」为准（当前语言），与分类页/详情页口径一致。
+// 反查不到（历史脏数据 / 注册表缺行）才回退文章自带的中文快照 post.category。
+const catName = (categories && categories.get(post.categorySlug)?.name) || post.category;
 ---
 <article class="post-card">
   {post.cover && (
@@ -17,7 +20,7 @@ const catHref = post.categorySlug
   )}
   <div class="post-card-main">
     <div class="post-meta">
-      {post.category && catHref && <a class="cat-tag" href={catHref}>{post.category}</a>}
+      {catName && catHref && <a class="cat-tag" href={catHref}>{catName}</a>}
       <time datetime={post.published_at}>{dateStr}</time>
     </div>
     <h2 class="post-title"><a href={href}>{post.title}</a></h2>
