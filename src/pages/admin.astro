@@ -1200,8 +1200,9 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     input.value = want;
 
     // 已上线文章改语言会连带改 URL，必须让用户知道旧链接会失效
+    // （用 tr-msg 而非底部 save-msg：切语言时视线在编辑器顶部，底部提示看不到）
     if (state.id) {
-      setMsg(`语言已切到${LANGS[nextLang]}，Slug 同步为「${want}」；该文章 URL 随之变化，旧链接将失效`, '');
+      setTrMsg(`语言已切到${LANGS[nextLang]}，Slug 同步为「${want}」；该文章 URL 随之变化，旧链接将失效`, '');
     }
   }
 
