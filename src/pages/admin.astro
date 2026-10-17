@@ -1064,8 +1064,8 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         state.id = '';
         state.lang = targetLang;
         syncSeg($('f-lang'), targetLang);
-        const slugNow = $('f-slug').value.trim();
-        if (!slugNow || slugNow === base) $('f-slug').value = `${base}-${targetLang}`;
+        // 以原文的 base slug 为准拼目标语言后缀（此刻标题仍是原文，不能按标题推导）
+        syncSlugWithLang(targetLang, base);
         $('delete-btn').hidden = true;
       }
       $('f-title').value = result.title;
@@ -1166,18 +1166,61 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   // 这样同一篇文章的各语言版本不会因 slug 相同而撞唯一约束。
   function autoSlug(title, lang) {
     const base = slugify(title) || 'post-' + Date.now();
-    const suffix = lang === 'en' ? '-en' : lang === 'ja' ? '-ja' : '';
-    return base + suffix;
+    return base + langSuffix(lang);
   }
 
-  // 实时提示最终会使用的 Slug
+  // 语言 → slug 后缀（中文无后缀）
+  function langSuffix(lang) {
+    return lang === 'en' ? '-en' : lang === 'ja' ? '-ja' : '';
+  }
+
+  // 剥掉尾部语言后缀。-en / -ja 反复切换时若只剥一次会叠成 xxx-en-ja，
+  // 这里循环剥到稳定（与 baseSlug 的单次剥离分开，不影响译文/媒体的既有匹配口径）
+  function stripLangSuffix(slug) {
+    let s = String(slug || '');
+    let prev;
+    do { prev = s; s = s.replace(/-(en|ja)$/, ''); } while (s !== prev);
+    return s;
+  }
+
+  // 切换语言时同步 slug 后缀：
+  //   1) 主体名优先取「已填 slug 剥掉旧后缀」，其次按标题生成 —— 手输内容只保留主体、不被覆盖
+  //   2) 剥离后再拼当前语言后缀 —— 来回切换只换后缀，不会重复追加
+  //   3) 主体名无从推导时保持空白（绝不写出孤零零的 "-en"），交给保存时 autoSlug 兜底
+  function syncSlugWithLang(nextLang, baseOverride) {
+    const input = $('f-slug');
+    if (!input) return;
+    const raw = input.value.trim();
+    let base = baseOverride || stripLangSuffix(raw);
+    if (!base) base = slugify($('f-title').value || '');
+    if (!base) { input.value = ''; return; }
+
+    const want = base + langSuffix(nextLang);
+    if (input.value.trim() === want) return;
+    input.value = want;
+
+    // 已上线文章改语言会连带改 URL，必须让用户知道旧链接会失效
+    if (state.id) {
+      setMsg(`语言已切到${LANGS[nextLang]}，Slug 同步为「${want}」；该文章 URL 随之变化，旧链接将失效`, '');
+    }
+  }
+
+  // 实时提示最终会使用的 Slug（含完整路径，便于直观确认语言与后缀是否一致）
   function updateSlugHint() {
     const el = $('slug-hint');
     if (!el) return;
     const manual = $('f-slug').value.trim();
-    el.textContent = manual
-      ? '将使用：' + manual
-      : '留空则自动生成：' + autoSlug($('f-title').value || '（标题）', state.lang);
+    const finalSlug = manual || autoSlug($('f-title').value || '（标题）', state.lang);
+    const path = `${state.lang === 'zh' ? '' : '/' + state.lang}/posts/${finalSlug}/`;
+    let text = (manual ? '将使用：' : '留空则自动生成：') + path;
+
+    const suffix = langSuffix(state.lang);
+    if (manual && suffix && !manual.endsWith(suffix)) {
+      text += `（当前为${LANGS[state.lang]}，建议以 ${suffix} 结尾；离开输入框会自动补齐）`;
+    } else if (manual && state.lang === 'zh' && /-(en|ja)$/.test(manual)) {
+      text += '（当前为中文版，建议去掉 -en / -ja 后缀）';
+    }
+    el.textContent = text;
   }
 
   // 保存期间禁用按钮，防止快速连点导致两次 INSERT 同一 slug
@@ -1849,8 +1892,16 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     };
 
     // 分段控件：语言 / 状态
+    // 语言切换联动 Slug：中文无后缀、EN 补 -en、JA 补 -ja；
+    // 已填 slug 只替换后缀部分，手输的主体名保留
     $('f-lang').querySelectorAll('button').forEach((b) => b.onclick = () => {
-      state.lang = b.dataset.v; syncSeg($('f-lang'), state.lang); updateSlugHint(); saveLocalDraft();
+      const next = b.dataset.v;
+      if (next === state.lang) { syncSeg($('f-lang'), state.lang); return; }
+      state.lang = next;
+      syncSeg($('f-lang'), state.lang);
+      syncSlugWithLang(next);
+      updateSlugHint();
+      saveLocalDraft();
     });
     $('f-status').querySelectorAll('button').forEach((b) => b.onclick = () => {
       state.status = b.dataset.v; syncSeg($('f-status'), state.status);
@@ -1875,9 +1926,22 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     $('f-content').addEventListener('input', () => { renderPreview(); saveLocalDraft(); });
     ['f-title', 'f-excerpt', 'f-cover', 'f-slug', 'f-author'].forEach((id) => {
       $(id).addEventListener('input', () => {
-        if (id === 'f-title') updateSlugHint();
+        if (id === 'f-title' || id === 'f-slug') updateSlugHint();
         saveLocalDraft();
       });
+    });
+    // Slug 失焦时按当前语言规整一次后缀：英/日文补 -en / -ja，已有旧后缀则替换而非叠加。
+    // 放在 blur 而非 input 上，避免边打字边被改写；中文态不强制去后缀，只在提示里建议。
+    $('f-slug').addEventListener('blur', () => {
+      const suffix = langSuffix(state.lang);
+      const raw = $('f-slug').value.trim();
+      if (!suffix || !raw) return;
+      const want = stripLangSuffix(raw) + suffix;
+      if (want !== raw) {
+        $('f-slug').value = want;
+        updateSlugHint();
+        saveLocalDraft();
+      }
     });
     // 发布时间：改动即存草稿；选了晚于当前的时间时提示「无定时发布，仅影响展示/排序」
     $('f-published-at').addEventListener('change', (e) => {
